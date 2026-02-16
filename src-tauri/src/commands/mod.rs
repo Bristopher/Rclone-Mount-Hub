@@ -1,6 +1,12 @@
 // Commands module - Tauri command handlers
 
-#[tauri::command]
-pub fn test_command() -> String {
-    "Rclone Mount Hub backend is running!".to_string()
-}
+pub mod rclone;
+pub mod network;
+pub mod system;
+pub mod speedtest;
+
+// Re-export all commands for easy registration
+pub use rclone::*;
+pub use network::*;
+pub use system::*;
+pub use speedtest::*;
