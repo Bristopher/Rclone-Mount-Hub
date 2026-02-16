@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "type": "lldb",
+      "type": "lldb-dap",
       "request": "launch",
       "name": "Tauri Development Debug",
       "cargo": {
@@ -15,7 +15,7 @@
       "preLaunchTask": "Frontend: Dev"
     },
     {
-      "type": "lldb",
+      "type": "lldb-dap",
       "request": "launch",
       "name": "Tauri Production Debug",
       "cargo": {

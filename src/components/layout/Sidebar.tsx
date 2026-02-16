@@ -38,10 +38,10 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
                 className={clsx(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer",
                   isActive
                     ? "bg-accent-blue/15 text-accent-blue border border-accent-blue/30"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-overlay"
+                    : "text-text-secondary hover:text-text-primary hover:bg-bg-overlay hover:scale-[1.02] active:scale-100"
                 )}
               >
                 <Icon size={18} weight={isActive ? "fill" : "regular"} />
