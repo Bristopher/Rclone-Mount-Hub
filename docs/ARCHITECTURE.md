@@ -640,7 +640,31 @@ Three presets, selectable per-connection:
 
 All profiles include: `--vfs-cache-mode full`, `--ignore-checksum`, `--no-modtime`, `--network-mode=false`
 
-### 10.4 Export / Import
+### 10.4 Speed Testing & Diagnostics
+- **Upload/Download Speed Test**: Test real-world transfer speeds to mounted drives
+  - Creates test files of various sizes (10MB, 100MB, 1GB)
+  - Measures upload and download speeds separately
+  - Shows real-time progress with transfer rate graph
+- **Bottleneck Detection**: Automatically identifies performance bottlenecks
+  - Tests network latency (ping)
+  - Tests disk I/O speed (local SSD/HDD performance)
+  - Tests rclone overhead (compares direct network speed vs rclone mount)
+  - Identifies if bottleneck is: network, client disk, server disk, or rclone config
+- **Network Path Analysis**:
+  - Shows active connection (LAN vs Tailscale/VPN)
+  - Displays route hops and latency per hop (traceroute)
+  - Detects if connection is local (same subnet) or over internet
+  - Shows NAT traversal info (STUN detection)
+- **Historical Performance Graphs**:
+  - Chart showing speed over time for each mount
+  - Compare LAN vs Tailscale performance
+  - Identify performance degradation trends
+- **Recommendations Engine**:
+  - Suggests optimal speed profile based on test results
+  - Recommends switching to LAN when available
+  - Warns about suboptimal cache/buffer settings
+
+### 10.5 Export / Import
 - **Export JSON**: Save all connection configs to a `.json` file
 - **Import JSON**: Load connections from a `.json` file (merges or replaces)
 - **Generate PS1**: Create a standalone `Smart_Mount.ps1` script for any connection
