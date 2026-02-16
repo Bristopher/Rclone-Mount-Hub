@@ -45,7 +45,16 @@
       "type": "shell",
       "command": "pnpm",
       "args": ["dev"],
-      "problemMatcher": [],
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "."
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".",
+          "endsPattern": "Local:.*http://localhost"
+        }
+      },
       "presentation": {
         "echo": true,
         "reveal": "always",
