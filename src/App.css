@@ -2,18 +2,18 @@
 
 @theme {
   /* === BACKGROUND LAYERS === */
-  --color-bg-base: #09090b;       /* zinc-950 - App background */
-  --color-bg-surface: #18181b;    /* zinc-900 - Card/panel background */
-  --color-bg-overlay: #27272a;    /* zinc-800 - Elevated elements */
+  --color-bg-base: #09090b;
+  --color-bg-surface: #111113;
+  --color-bg-overlay: #1c1c1f;
 
   /* === BORDERS === */
-  --color-border-default: rgb(63 63 70 / 0.5);   /* zinc-700/50 */
-  --color-border-hover: rgb(82 82 91 / 0.8);     /* zinc-600/80 */
+  --color-border-default: rgb(255 255 255 / 0.06);
+  --color-border-hover: rgb(255 255 255 / 0.12);
 
   /* === TEXT === */
-  --color-text-primary: #fafafa;      /* zinc-50 */
-  --color-text-secondary: #a1a1aa;    /* zinc-400 */
-  --color-text-tertiary: #71717a;     /* zinc-500 */
+  --color-text-primary: #ececef;
+  --color-text-secondary: #9898a0;
+  --color-text-tertiary: #65656d;
 
   /* === ACCENT COLORS === */
   --color-accent-blue: #3b82f6;
@@ -23,8 +23,8 @@
   --color-accent-purple: #a855f7;
 
   /* === GLASSMORPHISM === */
-  --color-glass-bg: rgb(24 24 27 / 0.6);
-  --color-glass-border: rgb(63 63 70 / 0.3);
+  --color-glass-bg: rgb(17 17 19 / 0.7);
+  --color-glass-border: rgb(255 255 255 / 0.06);
 }
 
 :root {
@@ -38,6 +38,9 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Tighter letter spacing like Apple/Spacedrive */
+  letter-spacing: -0.01em;
 }
 
 * {
@@ -56,10 +59,10 @@ body {
   height: 100vh;
 }
 
-/* === SCROLLBAR STYLING === */
+/* === SCROLLBAR STYLING (Spacedrive-thin) === */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -67,25 +70,58 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(82 82 91 / 0.5);
-  border-radius: 4px;
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(82 82 91 / 0.8);
+  background: rgb(255 255 255 / 0.15);
 }
 
-/* === GLASSMORPHISM UTILITIES === */
+/* Hide scrollbar by default, show on hover */
+.sidebar-scroll,
+.content-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.sidebar-scroll:hover,
+.content-scroll:hover {
+  scrollbar-color: rgb(255 255 255 / 0.08) transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb,
+.content-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.sidebar-scroll:hover::-webkit-scrollbar-thumb,
+.content-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.08);
+}
+
+/* === GLASSMORPHISM CARD === */
 .glass-card {
   background: var(--color-glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--color-glass-border);
-  border-radius: 12px;
-  transition: all 150ms ease;
+  border-radius: 10px;
+  transition: border-color 150ms ease, background 150ms ease;
 }
 
 .glass-card:hover {
   border-color: var(--color-border-hover);
-  background: rgb(24 24 27 / 0.8);
+}
+
+/* === FOCUS VISIBLE RING === */
+:focus-visible {
+  outline: 2px solid rgb(59 130 246 / 0.5);
+  outline-offset: 2px;
+}
+
+/* === SELECTION === */
+::selection {
+  background: rgb(59 130 246 / 0.3);
+  color: white;
 }
