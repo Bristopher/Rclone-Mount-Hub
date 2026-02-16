@@ -1,4 +1,4 @@
-import { X, Minus, Square } from "phosphor-react";
+import { X, Minus, CornersOut } from "phosphor-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 export function TitleBar() {
@@ -11,33 +11,35 @@ export function TitleBar() {
   return (
     <div
       data-tauri-drag-region
-      className="h-12 flex items-center justify-between px-4 bg-bg-base/80 backdrop-blur-xl border-b border-border-default select-none"
+      className="h-[38px] flex items-center justify-between bg-bg-base/90 backdrop-blur-xl border-b border-white/[0.06] select-none"
     >
-      <div data-tauri-drag-region className="flex items-center gap-3">
-        <div className="w-2 h-2 rounded-full bg-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
-        <h1 className="text-sm font-semibold text-text-primary">
+      {/* Left: drag region with app name */}
+      <div data-tauri-drag-region className="flex-1 flex items-center pl-4 gap-2.5 h-full">
+        <div className="w-[7px] h-[7px] rounded-full bg-accent-blue shadow-[0_0_6px_rgba(59,130,246,0.4)]" />
+        <span className="text-[12px] font-medium text-text-secondary tracking-tight">
           Rclone Mount Hub
-        </h1>
+        </span>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Right: window controls */}
+      <div className="flex items-center h-full">
         <button
           onClick={handleMinimize}
-          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-bg-overlay text-text-secondary hover:text-text-primary transition-all duration-150 cursor-pointer active:scale-95"
+          className="w-[46px] h-full flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-white/[0.06] transition-colors duration-100 cursor-pointer"
         >
-          <Minus size={16} weight="bold" />
+          <Minus size={14} weight="bold" />
         </button>
         <button
           onClick={handleMaximize}
-          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-bg-overlay text-text-secondary hover:text-text-primary transition-all duration-150 cursor-pointer active:scale-95"
+          className="w-[46px] h-full flex items-center justify-center text-text-tertiary hover:text-text-primary hover:bg-white/[0.06] transition-colors duration-100 cursor-pointer"
         >
-          <Square size={14} weight="bold" />
+          <CornersOut size={13} weight="bold" />
         </button>
         <button
           onClick={handleClose}
-          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-accent-red/20 text-text-secondary hover:text-accent-red transition-all duration-150 cursor-pointer active:scale-95"
+          className="w-[46px] h-full flex items-center justify-center text-text-tertiary hover:text-white hover:bg-accent-red transition-colors duration-100 cursor-pointer"
         >
-          <X size={16} weight="bold" />
+          <X size={14} weight="bold" />
         </button>
       </div>
     </div>

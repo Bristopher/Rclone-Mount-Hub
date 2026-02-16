@@ -14,10 +14,12 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="flex flex-col h-screen w-screen bg-bg-base text-text-primary overflow-hidden">
       <TitleBar />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
 
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 min-w-0 bg-bg-base">
+          {children}
+        </main>
       </div>
 
       <StatusBar mountedCount={0} networkStatus="offline" />
