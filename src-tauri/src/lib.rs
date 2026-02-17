@@ -20,6 +20,10 @@ pub fn run() {
             commands::create_remote,
             commands::delete_remote,
             commands::get_available_drives,
+            commands::mount_drive,
+            commands::unmount_drive,
+            commands::get_mount_status,
+            commands::get_all_mount_statuses,
             // Network commands
             commands::ping_host,
             commands::ping_port,
@@ -27,6 +31,10 @@ pub fn run() {
             // System commands
             commands::install_rclone,
             commands::install_winfsp,
+            commands::uninstall_rclone,
+            commands::uninstall_winfsp,
+            commands::get_driver_versions,
+            commands::check_driver_updates,
             commands::refresh_path,
             commands::open_rclone_web_ui,
             // Speed test commands
