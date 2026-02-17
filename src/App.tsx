@@ -37,7 +37,7 @@ function App() {
       case "dashboard":
         return <Dashboard onNavigate={setCurrentPage} />;
       case "add":
-        return <AddConnection />;
+        return <AddConnection onNavigate={setCurrentPage} />;
       case "settings":
         return <Settings />;
       case "export":

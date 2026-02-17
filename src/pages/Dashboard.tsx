@@ -371,8 +371,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                           </Badge>
                         )}
                       </div>
+                      {conn.description && (
+                        <div className="text-[12px] text-text-tertiary mb-1 italic">
+                          {conn.description}
+                        </div>
+                      )}
                       <div className="text-[13px] text-text-secondary">
-                        Drive {conn.drive_letter}: &bull; {conn.local_ip}:{conn.port} &bull;{" "}
+                        {conn.remote_type?.toUpperCase() || "WEBDAV"} &bull; Drive {conn.drive_letter}: &bull; {conn.local_ip}:{conn.port} &bull;{" "}
                         {conn.speed_profile} profile
                       </div>
                     </div>

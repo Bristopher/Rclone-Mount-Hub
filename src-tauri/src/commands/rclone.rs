@@ -109,28 +109,29 @@ pub async fn list_remotes(app: tauri::AppHandle) -> Result<Vec<String>, String> 
 pub async fn create_remote(
     app: tauri::AppHandle,
     name: String,
-    url: String,
-    vendor: String,
-    user: String,
-    pass: String,
+    remote_type: String,
+    params: std::collections::HashMap<String, String>,
 ) -> Result<(), String> {
+    // Build: rclone config create <name> <type> key1 val1 key2 val2 ...
+    let mut args = vec![
+        "config".to_string(),
+        "create".to_string(),
+        name,
+        remote_type,
+    ];
+
+    // Append each param as a key-value pair
+    for (key, value) in &params {
+        args.push(key.clone());
+        args.push(value.clone());
+    }
+
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+
     let output = app
         .shell()
         .command("rclone")
-        .args([
-            "config",
-            "create",
-            &name,
-            "webdav",
-            "url",
-            &url,
-            "vendor",
-            &vendor,
-            "user",
-            &user,
-            "pass",
-            &pass,
-        ])
+        .args(&args_ref)
         .output()
         .await
         .map_err(|e| e.to_string())?;

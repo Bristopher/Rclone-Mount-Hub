@@ -8,6 +8,9 @@ import {
   Check,
   ArrowLeft,
   CircleNotch,
+  Cloud,
+  Desktop,
+  Database,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -22,43 +25,162 @@ interface AddConnectionProps {
   onNavigate?: (page: string) => void;
 }
 
+// Supported remote types with display info
+const REMOTE_TYPES = [
+  {
+    id: "webdav",
+    label: "WebDAV",
+    icon: Globe,
+    color: "accent-blue",
+    desc: "Unraid, Nextcloud, copyparty",
+  },
+  {
+    id: "sftp",
+    label: "SFTP",
+    icon: Desktop,
+    color: "accent-purple",
+    desc: "SSH file transfer",
+  },
+  {
+    id: "smb",
+    label: "SMB / Samba",
+    icon: Desktop,
+    color: "accent-amber",
+    desc: "Windows shares, NAS",
+  },
+  {
+    id: "s3",
+    label: "S3",
+    icon: Cloud,
+    color: "accent-green",
+    desc: "AWS S3, MinIO, Backblaze",
+  },
+  {
+    id: "ftp",
+    label: "FTP",
+    icon: Database,
+    color: "text-text-tertiary",
+    desc: "Classic FTP server",
+  },
+] as const;
+
+type RemoteTypeId = (typeof REMOTE_TYPES)[number]["id"];
+
+// WebDAV vendor options
+const WEBDAV_VENDORS = [
+  { value: "copyparty", label: "Copyparty (Unraid)" },
+  { value: "nextcloud", label: "Nextcloud" },
+  { value: "owncloud", label: "ownCloud" },
+  { value: "sharepoint", label: "SharePoint" },
+  { value: "other", label: "Other WebDAV" },
+];
+
 export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
   const { add } = useConnectionStore();
   const { addLog } = useLogStore();
 
-  const [formData, setFormData] = useState({
-    name: "",
-    localIp: "192.168.1.x",
-    tailscaleIp: "",
-    port: "80",
-    driveLetter: "Z",
-    username: "",
-    password: "",
-    networkMode: "auto" as "auto" | "local" | "tailscale",
-    speedProfile: "balanced" as "max" | "balanced" | "low",
-    autoMount: true,
-  });
-
+  const [remoteType, setRemoteType] = useState<RemoteTypeId>("webdav");
   const [testing, setTesting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
 
-  const updateField = (field: string, value: unknown) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+  // Common fields
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [driveLetter, setDriveLetter] = useState("Z");
+  const [networkMode, setNetworkMode] = useState<"auto" | "local" | "tailscale">("auto");
+  const [speedProfile, setSpeedProfile] = useState<"max" | "balanced" | "low">("balanced");
+  const [autoMount, setAutoMount] = useState(true);
+
+  // WebDAV / SFTP / FTP / SMB fields
+  const [host, setHost] = useState("192.168.1.x");
+  const [tailscaleIp, setTailscaleIp] = useState("");
+  const [port, setPort] = useState("80");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [webdavVendor, setWebdavVendor] = useState("copyparty");
+
+  // S3 fields
+  const [s3Provider, setS3Provider] = useState("AWS");
+  const [s3AccessKey, setS3AccessKey] = useState("");
+  const [s3SecretKey, setS3SecretKey] = useState("");
+  const [s3Region, setS3Region] = useState("us-east-1");
+  const [s3Endpoint, setS3Endpoint] = useState("");
+  const [s3Bucket, setS3Bucket] = useState("");
+
+  // Default ports per type
+  const defaultPorts: Record<RemoteTypeId, string> = {
+    webdav: "80",
+    sftp: "22",
+    smb: "445",
+    s3: "",
+    ftp: "21",
+  };
+
+  const handleTypeChange = (type: RemoteTypeId) => {
+    setRemoteType(type);
+    setPort(defaultPorts[type]);
     setTestResult(null);
   };
 
+  const getTestHost = () => host;
+  const getTestPort = () => parseInt(port) || 0;
+
+  const buildRcloneParams = (): Record<string, string> => {
+    switch (remoteType) {
+      case "webdav":
+        return {
+          url: `http://${host}:${port}`,
+          vendor: webdavVendor,
+          user: username,
+          pass: password,
+        };
+      case "sftp":
+        return {
+          host,
+          port,
+          user: username,
+          pass: password,
+        };
+      case "smb":
+        return {
+          host,
+          user: username,
+          pass: password,
+        };
+      case "s3":
+        return {
+          provider: s3Provider,
+          access_key_id: s3AccessKey,
+          secret_access_key: s3SecretKey,
+          region: s3Region,
+          ...(s3Endpoint ? { endpoint: s3Endpoint } : {}),
+        };
+      case "ftp":
+        return {
+          host,
+          port,
+          user: username,
+          pass: password,
+        };
+    }
+  };
+
   const validateForm = () => {
-    if (!formData.name.trim()) {
+    if (!name.trim()) {
       toast.error("Connection name is required");
       return false;
     }
-    if (!formData.localIp.trim()) {
-      toast.error("Local IP address is required");
+    if (!driveLetter.trim()) {
+      toast.error("Drive letter is required");
       return false;
     }
-    if (!formData.driveLetter.trim()) {
-      toast.error("Drive letter is required");
+    if (remoteType !== "s3" && !host.trim()) {
+      toast.error("Host / IP address is required");
+      return false;
+    }
+    if (remoteType === "s3" && (!s3AccessKey || !s3SecretKey)) {
+      toast.error("S3 access key and secret key are required");
       return false;
     }
     return true;
@@ -69,23 +191,35 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
 
     setTesting(true);
     setTestResult(null);
-    addLog("info", `Testing connection to ${formData.localIp}:${formData.port}...`, "network");
+
+    const testHost = getTestHost();
+    const testPort = getTestPort();
+
+    addLog("info", `Testing connection to ${testHost}${testPort ? `:${testPort}` : ""}...`, "network");
 
     try {
+      if (remoteType === "s3") {
+        // For S3 we can't easily port-ping; just confirm fields are filled
+        toast.success("S3 config looks valid (start mount to verify credentials)");
+        setTestResult("success");
+        setTesting(false);
+        return;
+      }
+
       const reachable = await invoke<boolean>("ping_port", {
-        host: formData.localIp,
-        port: parseInt(formData.port),
+        host: testHost,
+        port: testPort,
         timeoutMs: 3000,
       });
 
       if (reachable) {
         setTestResult("success");
-        addLog("success", `Connection to ${formData.localIp}:${formData.port} successful`, "network");
+        addLog("success", `${testHost}:${testPort} is reachable`, "network");
         toast.success("Connection test passed");
       } else {
         setTestResult("error");
-        addLog("error", `Cannot reach ${formData.localIp}:${formData.port}`, "network");
-        toast.error(`Cannot reach ${formData.localIp}:${formData.port}`);
+        addLog("error", `Cannot reach ${testHost}:${testPort}`, "network");
+        toast.error(`Cannot reach ${testHost}:${testPort}`);
       }
     } catch (err) {
       setTestResult("error");
@@ -101,38 +235,36 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
     if (!validateForm()) return;
 
     setCreating(true);
-    addLog("info", `Creating rclone remote "${formData.name}"...`, "mounts");
+    addLog("info", `Creating rclone remote "${name}" (${remoteType})...`, "mounts");
 
     try {
-      // Create the rclone remote with credentials
       await invoke("create_remote", {
-        name: formData.name,
-        url: `http://${formData.localIp}:${formData.port}`,
-        vendor: "copyparty",
-        user: formData.username,
-        pass: formData.password,
+        name,
+        remoteType,
+        params: buildRcloneParams(),
       });
 
-      // Save connection to the store
       const connection: Connection = {
         id: crypto.randomUUID(),
-        name: formData.name,
-        local_ip: formData.localIp,
-        tailscale_ip: formData.tailscaleIp,
-        port: parseInt(formData.port),
-        drive_letter: formData.driveLetter,
+        name,
+        description,
+        remote_type: remoteType,
+        local_ip: remoteType === "s3" ? "" : host,
+        tailscale_ip: tailscaleIp,
+        port: parseInt(port) || 0,
+        drive_letter: driveLetter,
         protocol: "webdav",
-        username: formData.username,
-        network_mode: formData.networkMode,
-        speed_profile: formData.speedProfile,
-        auto_mount: formData.autoMount,
+        username,
+        network_mode: networkMode,
+        speed_profile: speedProfile,
+        auto_mount: autoMount,
         sort_order: Date.now(),
         created_at: new Date().toISOString(),
       };
 
       add(connection);
-      addLog("success", `Remote "${formData.name}" created and saved`, "mounts");
-      toast.success(`Created mount "${formData.name}"`);
+      addLog("success", `Remote "${name}" created`, "mounts");
+      toast.success(`Created mount "${name}"`);
       onNavigate?.("dashboard");
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -159,12 +291,52 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
             Add New Mount
           </h1>
           <p className="text-[13px] text-text-secondary">
-            Connect to your Unraid server, NAS, or cloud storage via WebDAV
+            Connect to a remote storage and mount it as a local drive
           </p>
         </div>
 
-        {/* Form */}
         <div className="space-y-6">
+          {/* Connection Type */}
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <Cloud size={18} weight="duotone" className="text-accent-blue" />
+              Connection Type
+            </h2>
+            <div className="grid grid-cols-5 gap-2">
+              {REMOTE_TYPES.map((type) => {
+                const Icon = type.icon;
+                const isSelected = remoteType === type.id;
+                return (
+                  <button
+                    key={type.id}
+                    onClick={() => handleTypeChange(type.id)}
+                    className={`p-3 rounded-lg border transition-all duration-150 text-left ${
+                      isSelected
+                        ? "bg-accent-blue/10 border-accent-blue/40"
+                        : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <Icon
+                      size={20}
+                      weight="duotone"
+                      className={`mb-1.5 ${isSelected ? "text-accent-blue" : "text-text-tertiary"}`}
+                    />
+                    <div
+                      className={`text-[13px] font-medium mb-0.5 ${
+                        isSelected ? "text-accent-blue" : "text-text-primary"
+                      }`}
+                    >
+                      {type.label}
+                    </div>
+                    <div className="text-[10px] text-text-tertiary leading-tight">
+                      {type.desc}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+
           {/* Basic Info */}
           <Card className="p-6">
             <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
@@ -172,124 +344,264 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
               Basic Information
             </h2>
             <div className="space-y-4">
-              <Input
-                label="Connection Name"
-                placeholder="e.g., MyNAS, Media Server"
-                value={formData.name}
-                onChange={(e) => updateField("name", e.target.value)}
-              />
               <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Connection Name"
+                  placeholder="e.g., MyNAS, Media Server"
+                  value={name}
+                  onChange={(e) => { setName(e.target.value); setTestResult(null); }}
+                />
                 <Input
                   label="Drive Letter"
                   placeholder="Z"
                   maxLength={1}
-                  value={formData.driveLetter}
-                  onChange={(e) =>
-                    updateField("driveLetter", e.target.value.toUpperCase())
-                  }
-                />
-                <Input
-                  label="Port"
-                  type="number"
-                  placeholder="80"
-                  value={formData.port}
-                  onChange={(e) => updateField("port", e.target.value)}
+                  value={driveLetter}
+                  onChange={(e) => setDriveLetter(e.target.value.toUpperCase())}
                 />
               </div>
+              <Input
+                label="Description (optional)"
+                placeholder="e.g., Unraid main storage, work NAS"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
             </div>
           </Card>
 
-          {/* Network Settings */}
+          {/* Type-specific fields */}
+          {remoteType === "webdav" && (
+            <Card className="p-6">
+              <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Globe size={18} weight="duotone" className="text-accent-purple" />
+                WebDAV Settings
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Server Software
+                  </label>
+                  <select
+                    value={webdavVendor}
+                    onChange={(e) => setWebdavVendor(e.target.value)}
+                    className="w-full bg-bg-overlay border border-border-default rounded-lg px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-accent-blue/60"
+                  >
+                    {WEBDAV_VENDORS.map((v) => (
+                      <option key={v.value} value={v.value}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2">
+                    <Input
+                      label="Host / IP (LAN)"
+                      placeholder="192.168.1.x"
+                      value={host}
+                      onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
+                      hint="Local network address"
+                    />
+                  </div>
+                  <Input
+                    label="Port"
+                    type="number"
+                    placeholder="80"
+                    value={port}
+                    onChange={(e) => setPort(e.target.value)}
+                  />
+                </div>
+                <Input
+                  label="Tailscale IP (optional)"
+                  placeholder="100.x.x.x"
+                  value={tailscaleIp}
+                  onChange={(e) => setTailscaleIp(e.target.value)}
+                  hint="Used when away from home"
+                />
+              </div>
+            </Card>
+          )}
+
+          {(remoteType === "sftp" || remoteType === "ftp") && (
+            <Card className="p-6">
+              <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Desktop size={18} weight="duotone" className="text-accent-purple" />
+                {remoteType.toUpperCase()} Settings
+              </h2>
+              <div className="space-y-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2">
+                    <Input
+                      label="Host / IP"
+                      placeholder="192.168.1.x"
+                      value={host}
+                      onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
+                    />
+                  </div>
+                  <Input
+                    label="Port"
+                    type="number"
+                    placeholder={remoteType === "sftp" ? "22" : "21"}
+                    value={port}
+                    onChange={(e) => setPort(e.target.value)}
+                  />
+                </div>
+                <Input
+                  label="Tailscale IP (optional)"
+                  placeholder="100.x.x.x"
+                  value={tailscaleIp}
+                  onChange={(e) => setTailscaleIp(e.target.value)}
+                />
+              </div>
+            </Card>
+          )}
+
+          {remoteType === "smb" && (
+            <Card className="p-6">
+              <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Desktop size={18} weight="duotone" className="text-accent-amber" />
+                SMB / Samba Settings
+              </h2>
+              <div className="space-y-4">
+                <Input
+                  label="Host / IP"
+                  placeholder="192.168.1.x or \\\\SERVER\\share"
+                  value={host}
+                  onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
+                />
+                <Input
+                  label="Tailscale IP (optional)"
+                  placeholder="100.x.x.x"
+                  value={tailscaleIp}
+                  onChange={(e) => setTailscaleIp(e.target.value)}
+                />
+              </div>
+            </Card>
+          )}
+
+          {remoteType === "s3" && (
+            <Card className="p-6">
+              <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Cloud size={18} weight="duotone" className="text-accent-green" />
+                S3 Settings
+              </h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Provider
+                  </label>
+                  <select
+                    value={s3Provider}
+                    onChange={(e) => setS3Provider(e.target.value)}
+                    className="w-full bg-bg-overlay border border-border-default rounded-lg px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-accent-blue/60"
+                  >
+                    {["AWS", "MinIO", "Backblaze", "Wasabi", "Other"].map((p) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Access Key ID"
+                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                    value={s3AccessKey}
+                    onChange={(e) => setS3AccessKey(e.target.value)}
+                  />
+                  <Input
+                    label="Secret Access Key"
+                    type="password"
+                    placeholder="••••••••"
+                    value={s3SecretKey}
+                    onChange={(e) => setS3SecretKey(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Region"
+                    placeholder="us-east-1"
+                    value={s3Region}
+                    onChange={(e) => setS3Region(e.target.value)}
+                  />
+                  <Input
+                    label="Bucket"
+                    placeholder="my-bucket"
+                    value={s3Bucket}
+                    onChange={(e) => setS3Bucket(e.target.value)}
+                  />
+                </div>
+                <Input
+                  label="Custom Endpoint (optional)"
+                  placeholder="https://s3.example.com"
+                  value={s3Endpoint}
+                  onChange={(e) => setS3Endpoint(e.target.value)}
+                  hint="For MinIO or other S3-compatible services"
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* Authentication (not S3 — it uses keys above) */}
+          {remoteType !== "s3" && (
+            <Card className="p-6">
+              <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+                <Lock size={18} weight="duotone" className="text-accent-amber" />
+                Authentication
+              </h2>
+              <div className="space-y-4">
+                <Input
+                  label="Username"
+                  placeholder="admin"
+                  icon={User}
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+                <Input
+                  label="Password"
+                  type="password"
+                  placeholder="••••••••"
+                  icon={Lock}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </Card>
+          )}
+
+          {/* Network Mode */}
           <Card className="p-6">
             <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
               <Globe size={18} weight="duotone" className="text-accent-purple" />
-              Network Configuration
+              Network Mode
             </h2>
-            <div className="space-y-4">
-              <Input
-                label="Local IP Address (LAN)"
-                placeholder="192.168.1.x"
-                value={formData.localIp}
-                onChange={(e) => updateField("localIp", e.target.value)}
-                hint="Used when connected to your home network"
-              />
-              <Input
-                label="Tailscale IP Address (Optional)"
-                placeholder="100.x.x.x"
-                value={formData.tailscaleIp}
-                onChange={(e) => updateField("tailscaleIp", e.target.value)}
-                hint="Used when away from home"
-              />
-
-              {/* Network Mode Selector */}
-              <div>
-                <label className="block text-[13px] font-medium text-text-secondary mb-2">
-                  Network Mode
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { value: "auto", label: "Auto", desc: "Smart switching" },
-                    { value: "local", label: "LAN Only", desc: "Local network" },
-                    { value: "tailscale", label: "Tailscale", desc: "Remote access" },
-                  ].map((mode) => (
-                    <button
-                      key={mode.value}
-                      onClick={() => updateField("networkMode", mode.value)}
-                      className={`
-                        p-3 rounded-lg border transition-all duration-150 text-left
-                        ${
-                          formData.networkMode === mode.value
-                            ? "bg-accent-blue/10 border-accent-blue/40 shadow-[0_0_12px_rgba(59,130,246,0.15)]"
-                            : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
-                        }
-                      `}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: "auto", label: "Auto", desc: "Smart switching" },
+                { value: "local", label: "LAN Only", desc: "Local network" },
+                { value: "tailscale", label: "Tailscale", desc: "Remote access" },
+              ].map((mode) => (
+                <button
+                  key={mode.value}
+                  onClick={() => setNetworkMode(mode.value as typeof networkMode)}
+                  className={`p-3 rounded-lg border transition-all duration-150 text-left ${
+                    networkMode === mode.value
+                      ? "bg-accent-blue/10 border-accent-blue/40"
+                      : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className={`text-[13px] font-medium ${
+                        networkMode === mode.value ? "text-accent-blue" : "text-text-primary"
+                      }`}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <span
-                          className={`text-[13px] font-medium ${
-                            formData.networkMode === mode.value
-                              ? "text-accent-blue"
-                              : "text-text-primary"
-                          }`}
-                        >
-                          {mode.label}
-                        </span>
-                        {formData.networkMode === mode.value && (
-                          <Check size={14} weight="bold" className="text-accent-blue" />
-                        )}
-                      </div>
-                      <span className="text-[11px] text-text-tertiary">
-                        {mode.desc}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Authentication */}
-          <Card className="p-6">
-            <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
-              <Lock size={18} weight="duotone" className="text-accent-amber" />
-              Authentication
-            </h2>
-            <div className="space-y-4">
-              <Input
-                label="Username"
-                placeholder="admin"
-                icon={User}
-                value={formData.username}
-                onChange={(e) => updateField("username", e.target.value)}
-              />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="••••••••"
-                icon={Lock}
-                value={formData.password}
-                onChange={(e) => updateField("password", e.target.value)}
-              />
+                      {mode.label}
+                    </span>
+                    {networkMode === mode.value && (
+                      <Check size={14} weight="bold" className="text-accent-blue" />
+                    )}
+                  </div>
+                  <span className="text-[11px] text-text-tertiary">{mode.desc}</span>
+                </button>
+              ))}
             </div>
           </Card>
 
@@ -301,63 +613,39 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
             </h2>
             <div className="grid grid-cols-3 gap-3">
               {[
-                {
-                  value: "max",
-                  label: "Max Speed",
-                  cache: "50 GB",
-                  desc: "10Gbps LAN, Fiber",
-                },
-                {
-                  value: "balanced",
-                  label: "Balanced",
-                  cache: "10 GB",
-                  desc: "Daily use (Recommended)",
-                },
-                {
-                  value: "low",
-                  label: "Low Resource",
-                  cache: "2 GB",
-                  desc: "Battery, slow WiFi",
-                },
+                { value: "max", label: "Max Speed", cache: "50 GB", desc: "10Gbps LAN, Fiber" },
+                { value: "balanced", label: "Balanced", cache: "10 GB", desc: "Daily use (Recommended)" },
+                { value: "low", label: "Low Resource", cache: "2 GB", desc: "Battery, slow WiFi" },
               ].map((profile) => (
                 <button
                   key={profile.value}
-                  onClick={() => updateField("speedProfile", profile.value)}
-                  className={`
-                    p-4 rounded-lg border transition-all duration-150 text-left
-                    ${
-                      formData.speedProfile === profile.value
-                        ? "bg-accent-green/10 border-accent-green/40 shadow-[0_0_12px_rgba(34,197,94,0.15)]"
-                        : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
-                    }
-                  `}
+                  onClick={() => setSpeedProfile(profile.value as typeof speedProfile)}
+                  className={`p-4 rounded-lg border transition-all duration-150 text-left ${
+                    speedProfile === profile.value
+                      ? "bg-accent-green/10 border-accent-green/40"
+                      : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  }`}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <span
                       className={`text-[13px] font-semibold ${
-                        formData.speedProfile === profile.value
-                          ? "text-accent-green"
-                          : "text-text-primary"
+                        speedProfile === profile.value ? "text-accent-green" : "text-text-primary"
                       }`}
                     >
                       {profile.label}
                     </span>
-                    {formData.speedProfile === profile.value && (
+                    {speedProfile === profile.value && (
                       <Check size={14} weight="bold" className="text-accent-green" />
                     )}
                   </div>
-                  <div className="text-[11px] text-text-tertiary mb-1">
-                    Cache: {profile.cache}
-                  </div>
-                  <div className="text-[11px] text-text-tertiary">
-                    {profile.desc}
-                  </div>
+                  <div className="text-[11px] text-text-tertiary mb-1">Cache: {profile.cache}</div>
+                  <div className="text-[11px] text-text-tertiary">{profile.desc}</div>
                 </button>
               ))}
             </div>
           </Card>
 
-          {/* Auto-mount Toggle */}
+          {/* Auto-mount */}
           <Card className="p-5 flex items-center justify-between">
             <div>
               <div className="text-[13px] font-medium text-text-primary mb-0.5">
@@ -368,21 +656,15 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
               </div>
             </div>
             <button
-              onClick={() => updateField("autoMount", !formData.autoMount)}
-              className={`
-                relative w-11 h-6 rounded-full transition-all duration-200
-                ${
-                  formData.autoMount
-                    ? "bg-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.3)]"
-                    : "bg-white/[0.15]"
-                }
-              `}
+              onClick={() => setAutoMount(!autoMount)}
+              className={`relative w-11 h-6 rounded-full transition-all duration-200 ${
+                autoMount ? "bg-accent-blue shadow-[0_0_8px_rgba(59,130,246,0.3)]" : "bg-white/[0.15]"
+              }`}
             >
               <div
-                className={`
-                  absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200
-                  ${formData.autoMount ? "left-[22px]" : "left-0.5"}
-                `}
+                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200 ${
+                  autoMount ? "left-[22px]" : "left-0.5"
+                }`}
               />
             </button>
           </Card>
@@ -401,7 +683,13 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
             <Button
               variant="default"
               size="md"
-              className={`gap-2 ${testResult === "success" ? "border-accent-green/40 text-accent-green" : testResult === "error" ? "border-accent-red/40 text-accent-red" : ""}`}
+              className={`gap-2 ${
+                testResult === "success"
+                  ? "border-accent-green/40 text-accent-green"
+                  : testResult === "error"
+                  ? "border-accent-red/40 text-accent-red"
+                  : ""
+              }`}
               onClick={handleTestConnection}
               disabled={testing || creating}
             >

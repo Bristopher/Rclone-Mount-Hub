@@ -3,6 +3,8 @@
 export interface Connection {
   id: string;
   name: string;
+  description: string;
+  remote_type: string; // rclone remote type: webdav, sftp, smb, s3, ftp, etc.
   local_ip: string;
   tailscale_ip: string;
   port: number;
