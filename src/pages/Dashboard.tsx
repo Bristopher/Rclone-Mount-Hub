@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Plus,
   HardDrives,
@@ -53,11 +53,15 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [externalMounts, setExternalMounts] = useState<ExternalMount[]>([]);
   const [unmanagedRemotes, setUnmanagedRemotes] = useState<RcloneRemote[]>([]);
+  const didAutoMount = useRef(false);
 
-  // Run auto-mount only once on initial mount, not on every connections change
+  // Run auto-mount exactly once — useRef guard prevents StrictMode double-fire
   useEffect(() => {
     checkDrivers();
-    autoMountConnections();
+    if (!didAutoMount.current) {
+      didAutoMount.current = true;
+      autoMountConnections();
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
