@@ -208,3 +208,7 @@ $RECYCLE.BIN/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/bin/
+
+
+*.claude*
+.vscode/commands/

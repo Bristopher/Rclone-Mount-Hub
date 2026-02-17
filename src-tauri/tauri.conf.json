@@ -5,7 +5,7 @@
   "identifier": "com.cbuzi.rclone-mount-hub-temp",
   "build": {
     "beforeDevCommand": "pnpm dev",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://localhost:1820",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },

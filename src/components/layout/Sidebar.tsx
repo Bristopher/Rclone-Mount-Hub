@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   HardDrives,
   Plus,
@@ -7,6 +8,7 @@ import {
   CirclesFour,
 } from "phosphor-react";
 import { clsx } from "clsx";
+import { invoke } from "@tauri-apps/api/core";
 
 interface SidebarProps {
   currentPage: string;
@@ -68,7 +70,32 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
+interface DriverVersions {
+  rclone_installed: boolean;
+  rclone_version: string | null;
+  winfsp_installed: boolean;
+  winfsp_version: string | null;
+}
+
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+  const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
+
+  useEffect(() => {
+    loadDriverVersions();
+    // Refresh every 10 seconds
+    const interval = setInterval(loadDriverVersions, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadDriverVersions = async () => {
+    try {
+      const versions = await invoke<DriverVersions>("get_driver_versions");
+      setDriverVersions(versions);
+    } catch (err) {
+      console.error("Failed to get driver versions:", err);
+    }
+  };
+
   return (
     <div className="w-[220px] h-full bg-bg-base/50 backdrop-blur-2xl border-r border-white/[0.06] flex flex-col select-none">
       {/* App identity */}
@@ -118,20 +145,44 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         </nav>
       </div>
 
-      {/* Bottom info */}
+      {/* Bottom info - Driver Status */}
       <div className="px-4 py-3 border-t border-white/[0.06]">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-accent-green shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
-          <span className="text-[11px] text-text-tertiary">
-            rclone v1.68.2
-          </span>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-accent-green shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
-          <span className="text-[11px] text-text-tertiary">
-            WinFsp ready
-          </span>
-        </div>
+        {driverVersions ? (
+          <>
+            <div className="flex items-center gap-2">
+              <div
+                className={clsx(
+                  "w-1.5 h-1.5 rounded-full",
+                  driverVersions.rclone_installed
+                    ? "bg-accent-green shadow-[0_0_6px_rgba(34,197,94,0.5)]"
+                    : "bg-accent-red shadow-[0_0_6px_rgba(239,68,68,0.5)]"
+                )}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                {driverVersions.rclone_installed
+                  ? `rclone ${driverVersions.rclone_version || "installed"}`
+                  : "rclone missing"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <div
+                className={clsx(
+                  "w-1.5 h-1.5 rounded-full",
+                  driverVersions.winfsp_installed
+                    ? "bg-accent-green shadow-[0_0_6px_rgba(34,197,94,0.5)]"
+                    : "bg-accent-red shadow-[0_0_6px_rgba(239,68,68,0.5)]"
+                )}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                {driverVersions.winfsp_installed
+                  ? `WinFsp ${driverVersions.winfsp_version || "ready"}`
+                  : "WinFsp missing"}
+              </span>
+            </div>
+          </>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">Checking drivers...</span>
+        )}
       </div>
     </div>
   );

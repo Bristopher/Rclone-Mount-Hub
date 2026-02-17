@@ -43,10 +43,12 @@
   letter-spacing: -0.01em;
 }
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 }
 
 body {
@@ -78,40 +80,37 @@ body {
   background: rgb(255 255 255 / 0.15);
 }
 
-/* Hide scrollbar by default, show on hover */
+/* Always show scrollbar for better UX */
 .sidebar-scroll,
 .content-scroll {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-.sidebar-scroll:hover,
-.content-scroll:hover {
   scrollbar-color: rgb(255 255 255 / 0.08) transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb,
 .content-scroll::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: rgb(255 255 255 / 0.08);
 }
 
-.sidebar-scroll:hover::-webkit-scrollbar-thumb,
-.content-scroll:hover::-webkit-scrollbar-thumb {
-  background: rgb(255 255 255 / 0.08);
+.sidebar-scroll::-webkit-scrollbar-thumb:hover,
+.content-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.15);
 }
 
 /* === GLASSMORPHISM CARD === */
 .glass-card {
   background: var(--color-glass-bg);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--color-glass-border);
-  border-radius: 10px;
-  transition: border-color 150ms ease, background 150ms ease;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
 .glass-card:hover {
   border-color: var(--color-border-hover);
+  background: rgb(17 17 19 / 0.8);
 }
 
 /* === FOCUS VISIBLE RING === */
