@@ -12,6 +12,24 @@ pub struct DriverVersions {
     pub winfsp_version: Option<String>,
 }
 
+// Helper to check if winget is available
+#[cfg(target_os = "windows")]
+async fn check_winget_available(app: &tauri::AppHandle) -> Result<(), String> {
+    let output = app
+        .shell()
+        .command("winget")
+        .args(["--version"])
+        .output()
+        .await
+        .map_err(|_| "winget is not installed or not in PATH. Please install winget from the Microsoft Store (App Installer).".to_string())?;
+
+    if !output.status.success() {
+        return Err("winget is not working properly. Please reinstall App Installer from Microsoft Store.".to_string());
+    }
+
+    Ok(())
+}
+
 #[command]
 pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -109,6 +127,9 @@ pub async fn is_autostart_enabled(_app: tauri::AppHandle) -> Result<bool, String
 pub async fn install_rclone(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        // Check if winget is available first
+        check_winget_available(&app).await?;
+
         let output = app
             .shell()
             .command("winget")
@@ -122,11 +143,22 @@ pub async fn install_rclone(app: tauri::AppHandle) -> Result<(), String> {
             ])
             .output()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Failed to execute winget: {}. Is winget installed?", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to install rclone: {}", stderr));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            // Combine stderr and stdout for better error messages
+            let error_msg = if !stderr.is_empty() {
+                stderr.to_string()
+            } else if !stdout.is_empty() {
+                stdout.to_string()
+            } else {
+                "Unknown error occurred".to_string()
+            };
+
+            return Err(format!("Rclone installation failed: {}", error_msg.trim()));
         }
 
         // Refresh PATH
@@ -145,6 +177,9 @@ pub async fn install_rclone(app: tauri::AppHandle) -> Result<(), String> {
 pub async fn install_winfsp(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
+        // Check if winget is available first
+        check_winget_available(&app).await?;
+
         let output = app
             .shell()
             .command("winget")
@@ -158,11 +193,22 @@ pub async fn install_winfsp(app: tauri::AppHandle) -> Result<(), String> {
             ])
             .output()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| format!("Failed to execute winget: {}. Is winget installed?", e))?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Failed to install WinFsp: {}", stderr));
+            let stdout = String::from_utf8_lossy(&output.stdout);
+
+            // Combine stderr and stdout for better error messages
+            let error_msg = if !stderr.is_empty() {
+                stderr.to_string()
+            } else if !stdout.is_empty() {
+                stdout.to_string()
+            } else {
+                "Unknown error occurred".to_string()
+            };
+
+            return Err(format!("WinFsp installation failed: {}", error_msg.trim()));
         }
 
         Ok(())
