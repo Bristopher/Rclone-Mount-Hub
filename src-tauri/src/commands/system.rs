@@ -2,7 +2,6 @@
 
 use tauri::command;
 use tauri_plugin_shell::ShellExt;
-use tauri_plugin_autostart::ManagerExt;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -15,30 +14,95 @@ pub struct DriverVersions {
 
 #[command]
 pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
-    let autostart_manager = app.autostart();
-    autostart_manager
-        .enable()
-        .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
 
-    Ok(())
+        // Get the current exe path
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("Failed to get exe path: {}", e))?;
+
+        let exe_path_str = exe_path.to_string_lossy();
+
+        // Create registry entry for autostart
+        let output = Command::new("reg")
+            .args([
+                "add",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "RcloneMountHub",
+                "/t",
+                "REG_SZ",
+                "/d",
+                &format!("\"{}\" --minimized", exe_path_str),
+                "/f",
+            ])
+            .output()
+            .map_err(|e| format!("Failed to add registry key: {}", e))?;
+
+        if !output.status.success() {
+            return Err("Failed to enable autostart".to_string());
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Autostart is only supported on Windows currently.".to_string())
+    }
 }
 
 #[command]
-pub async fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
-    let autostart_manager = app.autostart();
-    autostart_manager
-        .disable()
-        .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+pub async fn disable_autostart(_app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
 
-    Ok(())
+        let output = Command::new("reg")
+            .args([
+                "delete",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "RcloneMountHub",
+                "/f",
+            ])
+            .output()
+            .map_err(|e| format!("Failed to delete registry key: {}", e))?;
+
+        // Don't error if the key doesn't exist
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Autostart is only supported on Windows currently.".to_string())
+    }
 }
 
 #[command]
-pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
-    let autostart_manager = app.autostart();
-    autostart_manager
-        .is_enabled()
-        .map_err(|e| format!("Failed to check autostart status: {}", e))
+pub async fn is_autostart_enabled(_app: tauri::AppHandle) -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        let output = Command::new("reg")
+            .args([
+                "query",
+                "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v",
+                "RcloneMountHub",
+            ])
+            .output()
+            .map_err(|e| format!("Failed to query registry: {}", e))?;
+
+        Ok(output.status.success())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(false)
+    }
 }
 
 #[command]
