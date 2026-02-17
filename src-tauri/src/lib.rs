@@ -37,6 +37,7 @@ pub fn run() {
             // System commands
             commands::install_rclone,
             commands::install_winfsp,
+            commands::download_and_launch_winfsp_installer,
             commands::uninstall_rclone,
             commands::uninstall_winfsp,
             commands::get_driver_versions,
