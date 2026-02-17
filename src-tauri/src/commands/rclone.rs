@@ -432,3 +432,212 @@ fn is_process_alive(pid: u32) -> bool {
         }
     }
 }
+
+// New commands for viewing rclone config and detecting external mounts
+
+#[derive(Debug, serde::Serialize)]
+pub struct RcloneRemote {
+    pub name: String,
+    pub remote_type: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ExternalMount {
+    pub pid: u32,
+    pub remote_name: String,
+    pub mount_point: String,
+    pub command_line: String,
+}
+
+#[command]
+pub async fn list_rclone_remotes(app: tauri::AppHandle) -> Result<Vec<RcloneRemote>, String> {
+    let output = app
+        .shell()
+        .command("rclone")
+        .args(["listremotes"])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to list remotes: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to list rclone remotes".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut remotes = Vec::new();
+
+    for line in stdout.lines() {
+        if let Some(name) = line.strip_suffix(':') {
+            // Get type for this remote
+            let type_output = app
+                .shell()
+                .command("rclone")
+                .args(["config", "dump", name])
+                .output()
+                .await;
+
+            let remote_type = if let Ok(output) = type_output {
+                let dump = String::from_utf8_lossy(&output.stdout);
+                // Parse JSON to get type
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&dump) {
+                    json.get("type")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string()
+                } else {
+                    "unknown".to_string()
+                }
+            } else {
+                "unknown".to_string()
+            };
+
+            remotes.push(RcloneRemote {
+                name: name.to_string(),
+                remote_type,
+            });
+        }
+    }
+
+    Ok(remotes)
+}
+
+#[command]
+pub async fn get_rclone_config_dump(app: tauri::AppHandle) -> Result<String, String> {
+    let output = app
+        .shell()
+        .command("rclone")
+        .args(["config", "dump"])
+        .output()
+        .await
+        .map_err(|e| format!("Failed to dump config: {}", e))?;
+
+    if !output.status.success() {
+        return Err("Failed to get rclone config".to_string());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    Ok(stdout.to_string())
+}
+
+#[command]
+pub async fn list_external_rclone_mounts() -> Result<Vec<ExternalMount>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        // Use WMIC to get all rclone processes with command lines
+        let output = Command::new("wmic")
+            .args([
+                "process",
+                "where",
+                "name='rclone.exe'",
+                "get",
+                "ProcessId,CommandLine",
+                "/format:csv"
+            ])
+            .output()
+            .map_err(|e| format!("Failed to list processes: {}", e))?;
+
+        if !output.status.success() {
+            return Ok(Vec::new());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut mounts = Vec::new();
+        let tracked_pids: Vec<u32> = get_mounts_map().values().map(|m| m.pid).collect();
+
+        for line in stdout.lines().skip(1) {
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split(',').collect();
+            if parts.len() < 3 {
+                continue;
+            }
+
+            // Parse: Node,CommandLine,ProcessId
+            let command_line = parts[1].trim();
+            let pid_str = parts[2].trim();
+
+            if !command_line.contains("mount") {
+                continue;
+            }
+
+            if let Ok(pid) = pid_str.parse::<u32>() {
+                // Skip if we're already tracking this mount
+                if tracked_pids.contains(&pid) {
+                    continue;
+                }
+
+                // Parse remote name and mount point from command line
+                let mut remote_name = String::new();
+                let mut mount_point = String::new();
+
+                let args: Vec<&str> = command_line.split_whitespace().collect();
+                for (i, arg) in args.iter().enumerate() {
+                    if *arg == "mount" && i + 2 < args.len() {
+                        remote_name = args[i + 1].to_string();
+                        mount_point = args[i + 2].to_string();
+                        break;
+                    }
+                }
+
+                mounts.push(ExternalMount {
+                    pid,
+                    remote_name,
+                    mount_point,
+                    command_line: command_line.to_string(),
+                });
+            }
+        }
+
+        Ok(mounts)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        use std::process::Command;
+
+        let output = Command::new("ps")
+            .args(["aux"])
+            .output()
+            .map_err(|e| format!("Failed to list processes: {}", e))?;
+
+        if !output.status.success() {
+            return Ok(Vec::new());
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut mounts = Vec::new();
+        let tracked_pids: Vec<u32> = get_mounts_map().values().map(|m| m.pid).collect();
+
+        for line in stdout.lines() {
+            if !line.contains("rclone") || !line.contains("mount") {
+                continue;
+            }
+
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() < 2 {
+                continue;
+            }
+
+            if let Ok(pid) = parts[1].parse::<u32>() {
+                if tracked_pids.contains(&pid) {
+                    continue;
+                }
+
+                let command_line = parts[10..].join(" ");
+
+                mounts.push(ExternalMount {
+                    pid,
+                    remote_name: String::new(),
+                    mount_point: String::new(),
+                    command_line,
+                });
+            }
+        }
+
+        Ok(mounts)
+    }
+}
