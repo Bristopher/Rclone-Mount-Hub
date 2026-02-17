@@ -14,6 +14,7 @@ import {
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { DriverCardSkeleton } from "../components/ui/Skeleton";
 import { useSettingsStore } from "../lib/store";
 import { useLogStore } from "../lib/logStore";
 import { Check } from "phosphor-react";
@@ -32,6 +33,7 @@ export function Settings() {
   const { settings, update, reset } = useSettingsStore();
   const { addLog } = useLogStore();
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
+  const [driversLoading, setDriversLoading] = useState(true);
   const [installingDrivers, setInstallingDrivers] = useState(false);
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [winfspInstallerLaunched, setWinfspInstallerLaunched] = useState(false);
@@ -68,11 +70,14 @@ export function Settings() {
   };
 
   const loadDriverVersions = async () => {
+    setDriversLoading(true);
     try {
       const versions = await invoke<DriverVersions>("get_driver_versions");
       setDriverVersions(versions);
     } catch (err) {
       console.error("Failed to get driver versions:", err);
+    } finally {
+      setDriversLoading(false);
     }
   };
 
@@ -422,7 +427,9 @@ export function Settings() {
               Driver Management
             </h2>
 
-            {driverVersions ? (
+            {driversLoading ? (
+              <DriverCardSkeleton />
+            ) : driverVersions ? (
               <div className="space-y-4">
                 {/* Driver Status */}
                 <div className="grid grid-cols-2 gap-4">
@@ -580,7 +587,7 @@ export function Settings() {
               </div>
             ) : (
               <div className="text-[13px] text-text-tertiary">
-                Loading driver information...
+                Could not load driver information.
               </div>
             )}
           </Card>

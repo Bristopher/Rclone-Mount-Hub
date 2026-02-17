@@ -79,11 +79,16 @@ interface DriverVersions {
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
+  const [activeMountCount, setActiveMountCount] = useState(0);
 
   useEffect(() => {
     loadDriverVersions();
-    // Refresh every 10 seconds
-    const interval = setInterval(loadDriverVersions, 10000);
+    refreshActiveMounts();
+
+    const interval = setInterval(() => {
+      loadDriverVersions();
+      refreshActiveMounts();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -93,6 +98,21 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       setDriverVersions(versions);
     } catch (err) {
       console.error("Failed to get driver versions:", err);
+    }
+  };
+
+  const refreshActiveMounts = async () => {
+    try {
+      const [managedStatuses, externalMounts] = await Promise.all([
+        invoke<Record<string, { state: string }>>("get_all_mount_statuses"),
+        invoke<unknown[]>("list_external_rclone_mounts"),
+      ]);
+      const managedActive = Object.values(managedStatuses).filter(
+        (s) => s.state === "mounted"
+      ).length;
+      setActiveMountCount(managedActive + externalMounts.length);
+    } catch {
+      // silently ignore
     }
   };
 
@@ -109,7 +129,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               Mount Hub
             </h2>
             <p className="text-[11px] text-text-tertiary leading-tight">
-              0 active
+              {activeMountCount} active
             </p>
           </div>
         </div>
