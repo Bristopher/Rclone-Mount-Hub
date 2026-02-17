@@ -27,6 +27,9 @@ pub fn run() {
             commands::unmount_drive,
             commands::get_mount_status,
             commands::get_all_mount_statuses,
+            commands::list_rclone_remotes,
+            commands::get_rclone_config_dump,
+            commands::list_external_rclone_mounts,
             // Network commands
             commands::ping_host,
             commands::ping_port,
