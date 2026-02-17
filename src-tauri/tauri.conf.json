@@ -13,9 +13,11 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "rclone-mount-hub-temp",
+        "title": "Rclone Mount Hub",
         "width": 1000,
-        "height": 840
+        "height": 840,
+        "decorations": false,
+        "transparent": false
       }
     ],
     "security": {
