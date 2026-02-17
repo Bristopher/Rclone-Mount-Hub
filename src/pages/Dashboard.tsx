@@ -9,7 +9,8 @@ import {
   Stop,
   Warning,
   Trash,
-  Pencil,
+  CloudArrowDown,
+  DesktopTower,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -31,34 +32,48 @@ interface DriverVersions {
   winfsp_version: string | null;
 }
 
+interface ExternalMount {
+  pid: number;
+  remote_name: string;
+  mount_point: string;
+  command_line: string;
+}
+
+interface RcloneRemote {
+  name: string;
+  remote_type: string;
+}
+
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { connections, remove } = useConnectionStore();
   const { addLog } = useLogStore();
   const [mountStatuses, setMountStatuses] = useState<Record<string, MountStatus>>({});
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [externalMounts, setExternalMounts] = useState<ExternalMount[]>([]);
+  const [unmanagedRemotes, setUnmanagedRemotes] = useState<RcloneRemote[]>([]);
 
   useEffect(() => {
     checkDrivers();
     refreshStatuses();
+    refreshExternalMounts();
     autoMountConnections();
 
-    // Poll mount statuses every 3 seconds
-    const interval = setInterval(refreshStatuses, 3000);
+    const interval = setInterval(() => {
+      refreshStatuses();
+      refreshExternalMounts();
+    }, 3000);
     return () => clearInterval(interval);
   }, [connections]);
 
   const autoMountConnections = async () => {
-    // Auto-mount connections on startup
     for (const conn of connections) {
       if (conn.auto_mount) {
-        // Check if already mounted
         try {
           const status = await invoke<MountStatus>("get_mount_status", {
             connectionId: conn.id,
           });
           if (status.state !== "mounted") {
-            // Mount silently (no toast, just notification)
             await handleMount(conn);
           }
         } catch (err) {
@@ -92,6 +107,25 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     setMountStatuses(statuses);
   };
 
+  const refreshExternalMounts = async () => {
+    try {
+      const [externals, remotes] = await Promise.all([
+        invoke<ExternalMount[]>("list_external_rclone_mounts"),
+        invoke<RcloneRemote[]>("list_rclone_remotes"),
+      ]);
+      setExternalMounts(externals);
+
+      // Find remotes that aren't managed by any connection in our store
+      const managedNames = new Set(connections.map((c) => c.name.toLowerCase()));
+      const unmanaged = remotes.filter(
+        (r) => !managedNames.has(r.name.toLowerCase())
+      );
+      setUnmanagedRemotes(unmanaged);
+    } catch (err) {
+      console.error("Failed to fetch external mounts:", err);
+    }
+  };
+
   const handleMount = async (conn: Connection) => {
     setLoading({ ...loading, [conn.id]: true });
     addLog("info", `Mounting ${conn.name} to drive ${conn.drive_letter}:...`, "mounts");
@@ -103,10 +137,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       setMountStatuses({ ...mountStatuses, [conn.id]: status });
 
       const mode = status.active_mode === "local" ? "LAN" : "Tailscale";
-      addLog("success", `✓ ${conn.name} mounted successfully via ${mode}`, "mounts");
+      addLog("success", `${conn.name} mounted successfully via ${mode}`, "mounts");
       toast.success(`Mounted ${conn.name} to drive ${conn.drive_letter}:`);
 
-      // Send system notification
       try {
         await invoke("send_notification", {
           title: "Drive Mounted",
@@ -117,7 +150,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : `Failed to mount ${conn.name}`;
-      addLog("error", `✗ Mount failed: ${errorMsg}`, "mounts");
+      addLog("error", `Mount failed: ${errorMsg}`, "mounts");
       toast.error(errorMsg);
     } finally {
       setLoading({ ...loading, [conn.id]: false });
@@ -134,10 +167,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         connectionId: conn.id,
       });
       setMountStatuses({ ...mountStatuses, [conn.id]: status });
-      addLog("success", `✓ ${conn.name} unmounted successfully`, "mounts");
+      addLog("success", `${conn.name} unmounted successfully`, "mounts");
       toast.success(`Unmounted ${conn.name}`);
 
-      // Send system notification
       try {
         await invoke("send_notification", {
           title: "Drive Unmounted",
@@ -148,10 +180,29 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : `Failed to unmount ${conn.name}`;
-      addLog("error", `✗ Unmount failed: ${errorMsg}`, "mounts");
+      addLog("error", `Unmount failed: ${errorMsg}`, "mounts");
       toast.error(errorMsg);
     } finally {
       setLoading({ ...loading, [conn.id]: false });
+    }
+  };
+
+  const handleUnmountExternal = async (mount: ExternalMount) => {
+    const key = `ext-${mount.pid}`;
+    setLoading({ ...loading, [key]: true });
+    addLog("info", `Unmounting external mount ${mount.remote_name} (PID ${mount.pid})...`, "mounts");
+
+    try {
+      await invoke("unmount_external_mount", { pid: mount.pid });
+      addLog("success", `External mount ${mount.remote_name} unmounted`, "mounts");
+      toast.success(`Unmounted ${mount.remote_name || mount.mount_point}`);
+      await refreshExternalMounts();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Failed to unmount external: ${errorMsg}`, "mounts");
+      toast.error(errorMsg);
+    } finally {
+      setLoading({ ...loading, [key]: false });
     }
   };
 
@@ -160,7 +211,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       return;
     }
 
-    // Unmount if mounted
     const status = mountStatuses[conn.id];
     if (status?.state === "mounted") {
       try {
@@ -170,19 +220,33 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       }
     }
 
-    // Delete rclone remote
     try {
       await invoke("delete_remote", { name: conn.name });
     } catch (err) {
       console.error("Failed to delete remote:", err);
     }
 
-    // Remove from store
     remove(conn.id);
     toast.success(`Deleted ${conn.name}`);
   };
 
+  const handleDeleteRemote = async (remoteName: string) => {
+    if (!confirm(`Delete rclone remote "${remoteName}"? This will remove it from rclone config.`)) {
+      return;
+    }
+
+    try {
+      await invoke("delete_remote", { name: remoteName });
+      toast.success(`Deleted remote ${remoteName}`);
+      await refreshExternalMounts();
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      toast.error(errorMsg);
+    }
+  };
+
   const activeMounts = Object.values(mountStatuses).filter(s => s.state === "mounted").length;
+  const totalActive = activeMounts + externalMounts.length;
   const driversInstalled = driverVersions?.rclone_installed && driverVersions?.winfsp_installed;
 
   return (
@@ -203,7 +267,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               variant="ghost"
               size="sm"
               className="gap-1.5 text-[13px]"
-              onClick={refreshStatuses}
+              onClick={() => {
+                refreshStatuses();
+                refreshExternalMounts();
+              }}
             >
               <ArrowsClockwise size={15} weight="bold" />
               Refresh
@@ -250,27 +317,30 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           <StatCard
             icon={HardDrives}
             label="Total Mounts"
-            value={connections.length.toString()}
+            value={(connections.length + unmanagedRemotes.length).toString()}
             color="text-text-primary"
           />
           <StatCard
             icon={Lightning}
             label="Active"
-            value={activeMounts.toString()}
+            value={totalActive.toString()}
             color="text-accent-green"
           />
           <StatCard
             icon={WifiHigh}
             label="Network"
-            value={activeMounts > 0 ? "Online" : "Offline"}
-            color={activeMounts > 0 ? "text-accent-green" : "text-text-tertiary"}
+            value={totalActive > 0 ? "Online" : "Offline"}
+            color={totalActive > 0 ? "text-accent-green" : "text-text-tertiary"}
             isText
           />
         </div>
 
-        {/* Connections List */}
-        {connections.length > 0 ? (
+        {/* Managed Connections */}
+        {connections.length > 0 && (
           <div className="space-y-3">
+            <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
+              Managed Connections
+            </div>
             {connections.map((conn) => {
               const status = mountStatuses[conn.id];
               const isMounted = status?.state === "mounted";
@@ -279,7 +349,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               return (
                 <Card key={conn.id} className="p-5">
                   <div className="flex items-center justify-between">
-                    {/* Left: Info */}
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-base font-semibold text-text-primary">
@@ -303,12 +372,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         )}
                       </div>
                       <div className="text-[13px] text-text-secondary">
-                        Drive {conn.drive_letter}: • {conn.local_ip}:{conn.port} •{" "}
+                        Drive {conn.drive_letter}: &bull; {conn.local_ip}:{conn.port} &bull;{" "}
                         {conn.speed_profile} profile
                       </div>
                     </div>
 
-                    {/* Right: Actions */}
                     <div className="flex items-center gap-2">
                       {isMounted ? (
                         <Button
@@ -355,7 +423,117 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               );
             })}
           </div>
-        ) : (
+        )}
+
+        {/* External Active Mounts */}
+        {externalMounts.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
+              External Mounts (running outside this app)
+            </div>
+            {externalMounts.map((mount) => {
+              const key = `ext-${mount.pid}`;
+              const isLoading = loading[key];
+              const displayName = mount.remote_name
+                ? mount.remote_name.replace(/:$/, "")
+                : "Unknown";
+
+              return (
+                <Card key={key} className="p-5 border-accent-amber/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <DesktopTower size={18} className="text-accent-amber" weight="duotone" />
+                        <h3 className="text-base font-semibold text-text-primary">
+                          {displayName}
+                        </h3>
+                        <Badge variant="connected" dot>
+                          Mounted
+                        </Badge>
+                        <Badge variant="default">External</Badge>
+                      </div>
+                      <div className="text-[13px] text-text-secondary">
+                        {mount.mount_point ? `Drive ${mount.mount_point}` : "Mount point unknown"} &bull; PID {mount.pid}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleUnmountExternal(mount)}
+                        disabled={isLoading}
+                        className="gap-1.5"
+                      >
+                        {isLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Stop size={14} weight="bold" />
+                        )}
+                        Unmount
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Unmanaged Rclone Remotes */}
+        {unmanagedRemotes.length > 0 && (
+          <div className="space-y-3">
+            <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
+              Rclone Remotes (in rclone config, not managed here)
+            </div>
+            {unmanagedRemotes.map((remote) => {
+              // Check if this remote is currently mounted externally
+              const externallyMounted = externalMounts.find(
+                (m) =>
+                  m.remote_name.replace(/:$/, "").toLowerCase() ===
+                  remote.name.toLowerCase()
+              );
+
+              return (
+                <Card key={remote.name} className="p-5 border-border-default/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <CloudArrowDown size={18} className="text-text-tertiary" weight="duotone" />
+                        <h3 className="text-base font-semibold text-text-primary">
+                          {remote.name}
+                        </h3>
+                        <Badge variant="default">{remote.remote_type}</Badge>
+                        {externallyMounted && (
+                          <Badge variant="connected" dot>
+                            Mounted ({externallyMounted.mount_point})
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-[13px] text-text-secondary">
+                        Configured in rclone but not managed by this app
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteRemote(remote.name)}
+                        className="gap-1.5"
+                      >
+                        <Trash size={14} weight="bold" />
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {connections.length === 0 && externalMounts.length === 0 && unmanagedRemotes.length === 0 && (
           <Card className="flex flex-col items-center justify-center text-center py-20 px-8">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-blue/15 to-accent-purple/15 border border-white/[0.08] flex items-center justify-center mb-6 shadow-[0_8px_24px_rgba(59,130,246,0.12)]">
               <HardDrives size={32} className="text-accent-blue" weight="duotone" />

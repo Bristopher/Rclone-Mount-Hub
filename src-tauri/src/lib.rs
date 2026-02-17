@@ -30,6 +30,7 @@ pub fn run() {
             commands::list_rclone_remotes,
             commands::get_rclone_config_dump,
             commands::list_external_rclone_mounts,
+            commands::unmount_external_mount,
             // Network commands
             commands::ping_host,
             commands::ping_port,

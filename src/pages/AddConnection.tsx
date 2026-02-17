@@ -6,12 +6,26 @@ import {
   User,
   Lightning,
   Check,
+  ArrowLeft,
+  CircleNotch,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Input } from "../components/ui/Input";
+import { useConnectionStore } from "../lib/store";
+import { useLogStore } from "../lib/logStore";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
+import type { Connection } from "../lib/types";
 
-export function AddConnection() {
+interface AddConnectionProps {
+  onNavigate?: (page: string) => void;
+}
+
+export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
+  const { add } = useConnectionStore();
+  const { addLog } = useLogStore();
+
   const [formData, setFormData] = useState({
     name: "",
     localIp: "192.168.1.x",
@@ -25,8 +39,108 @@ export function AddConnection() {
     autoMount: true,
   });
 
-  const updateField = (field: string, value: any) => {
+  const [testing, setTesting] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
+
+  const updateField = (field: string, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setTestResult(null);
+  };
+
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast.error("Connection name is required");
+      return false;
+    }
+    if (!formData.localIp.trim()) {
+      toast.error("Local IP address is required");
+      return false;
+    }
+    if (!formData.driveLetter.trim()) {
+      toast.error("Drive letter is required");
+      return false;
+    }
+    return true;
+  };
+
+  const handleTestConnection = async () => {
+    if (!validateForm()) return;
+
+    setTesting(true);
+    setTestResult(null);
+    addLog("info", `Testing connection to ${formData.localIp}:${formData.port}...`, "network");
+
+    try {
+      const reachable = await invoke<boolean>("ping_port", {
+        host: formData.localIp,
+        port: parseInt(formData.port),
+        timeoutMs: 3000,
+      });
+
+      if (reachable) {
+        setTestResult("success");
+        addLog("success", `Connection to ${formData.localIp}:${formData.port} successful`, "network");
+        toast.success("Connection test passed");
+      } else {
+        setTestResult("error");
+        addLog("error", `Cannot reach ${formData.localIp}:${formData.port}`, "network");
+        toast.error(`Cannot reach ${formData.localIp}:${formData.port}`);
+      }
+    } catch (err) {
+      setTestResult("error");
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Test failed: ${msg}`, "network");
+      toast.error(`Test failed: ${msg}`);
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleCreate = async () => {
+    if (!validateForm()) return;
+
+    setCreating(true);
+    addLog("info", `Creating rclone remote "${formData.name}"...`, "mounts");
+
+    try {
+      // Create the rclone remote with credentials
+      await invoke("create_remote", {
+        name: formData.name,
+        url: `http://${formData.localIp}:${formData.port}`,
+        vendor: "copyparty",
+        user: formData.username,
+        pass: formData.password,
+      });
+
+      // Save connection to the store
+      const connection: Connection = {
+        id: crypto.randomUUID(),
+        name: formData.name,
+        local_ip: formData.localIp,
+        tailscale_ip: formData.tailscaleIp,
+        port: parseInt(formData.port),
+        drive_letter: formData.driveLetter,
+        protocol: "webdav",
+        username: formData.username,
+        network_mode: formData.networkMode,
+        speed_profile: formData.speedProfile,
+        auto_mount: formData.autoMount,
+        sort_order: Date.now(),
+        created_at: new Date().toISOString(),
+      };
+
+      add(connection);
+      addLog("success", `Remote "${formData.name}" created and saved`, "mounts");
+      toast.success(`Created mount "${formData.name}"`);
+      onNavigate?.("dashboard");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Failed to create remote: ${msg}`, "mounts");
+      toast.error(`Failed to create: ${msg}`);
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -34,6 +148,13 @@ export function AddConnection() {
       <div className="px-10 py-8 pb-12 max-w-3xl w-full mx-auto">
         {/* Header */}
         <div className="mb-8">
+          <button
+            onClick={() => onNavigate?.("dashboard")}
+            className="flex items-center gap-1.5 text-[13px] text-text-tertiary hover:text-text-secondary mb-4 transition-colors"
+          >
+            <ArrowLeft size={14} weight="bold" />
+            Back to Overview
+          </button>
           <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-2">
             Add New Mount
           </h1>
@@ -268,16 +389,44 @@ export function AddConnection() {
 
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
-            <Button variant="ghost" size="md" className="flex-1">
+            <Button
+              variant="ghost"
+              size="md"
+              className="flex-1"
+              onClick={() => onNavigate?.("dashboard")}
+              disabled={creating}
+            >
               Cancel
             </Button>
-            <Button variant="default" size="md" className="gap-2">
-              <Globe size={16} weight="bold" />
-              Test Connection
+            <Button
+              variant="default"
+              size="md"
+              className={`gap-2 ${testResult === "success" ? "border-accent-green/40 text-accent-green" : testResult === "error" ? "border-accent-red/40 text-accent-red" : ""}`}
+              onClick={handleTestConnection}
+              disabled={testing || creating}
+            >
+              {testing ? (
+                <CircleNotch size={16} weight="bold" className="animate-spin" />
+              ) : testResult === "success" ? (
+                <Check size={16} weight="bold" />
+              ) : (
+                <Globe size={16} weight="bold" />
+              )}
+              {testing ? "Testing..." : testResult === "success" ? "Reachable" : "Test Connection"}
             </Button>
-            <Button variant="primary" size="md" className="gap-2">
-              <Check size={16} weight="bold" />
-              Create Mount
+            <Button
+              variant="primary"
+              size="md"
+              className="gap-2"
+              onClick={handleCreate}
+              disabled={creating || testing}
+            >
+              {creating ? (
+                <CircleNotch size={16} weight="bold" className="animate-spin" />
+              ) : (
+                <Check size={16} weight="bold" />
+              )}
+              {creating ? "Creating..." : "Create Mount"}
             </Button>
           </div>
         </div>
