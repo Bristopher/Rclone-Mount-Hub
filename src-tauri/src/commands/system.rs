@@ -2,6 +2,7 @@
 
 use tauri::command;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_autostart::ManagerExt;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -14,8 +15,6 @@ pub struct DriverVersions {
 
 #[command]
 pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_autostart::ManagerExt;
-
     let autostart_manager = app.autostart();
     autostart_manager
         .enable()
@@ -26,8 +25,6 @@ pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
 
 #[command]
 pub async fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri_plugin_autostart::ManagerExt;
-
     let autostart_manager = app.autostart();
     autostart_manager
         .disable()
@@ -38,8 +35,6 @@ pub async fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
 
 #[command]
 pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
-    use tauri_plugin_autostart::ManagerExt;
-
     let autostart_manager = app.autostart();
     autostart_manager
         .is_enabled()
