@@ -16,6 +16,7 @@ import {
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
+import { ConnectionCardSkeleton, StatCardsSkeleton } from "../components/ui/Skeleton";
 import { useConnectionStore } from "../lib/store";
 import { useLogStore } from "../lib/logStore";
 import type { Connection, MountStatus } from "../lib/types";
@@ -53,6 +54,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [externalMounts, setExternalMounts] = useState<ExternalMount[]>([]);
   const [unmanagedRemotes, setUnmanagedRemotes] = useState<RcloneRemote[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const didAutoMount = useRef(false);
 
   // Run auto-mount exactly once — useRef guard prevents StrictMode double-fire
@@ -65,8 +67,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    refreshStatuses();
-    refreshExternalMounts();
+    const init = async () => {
+      await Promise.all([refreshStatuses(), refreshExternalMounts()]);
+      setInitialLoading(false);
+    };
+    init();
 
     const interval = setInterval(() => {
       refreshStatuses();
@@ -335,30 +340,41 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         )}
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <StatCard
-            icon={HardDrives}
-            label="Total Mounts"
-            value={(connections.length + unmanagedRemotes.length).toString()}
-            color="text-text-primary"
-          />
-          <StatCard
-            icon={Lightning}
-            label="Active"
-            value={totalActive.toString()}
-            color="text-accent-green"
-          />
-          <StatCard
-            icon={WifiHigh}
-            label="Network"
-            value={totalActive > 0 ? "Online" : "Offline"}
-            color={totalActive > 0 ? "text-accent-green" : "text-text-tertiary"}
-            isText
-          />
-        </div>
+        {initialLoading ? (
+          <StatCardsSkeleton />
+        ) : (
+          <div className="grid grid-cols-3 gap-4">
+            <StatCard
+              icon={HardDrives}
+              label="Total Mounts"
+              value={(connections.length + unmanagedRemotes.length).toString()}
+              color="text-text-primary"
+            />
+            <StatCard
+              icon={Lightning}
+              label="Active"
+              value={totalActive.toString()}
+              color="text-accent-green"
+            />
+            <StatCard
+              icon={WifiHigh}
+              label="Network"
+              value={totalActive > 0 ? "Online" : "Offline"}
+              color={totalActive > 0 ? "text-accent-green" : "text-text-tertiary"}
+              isText
+            />
+          </div>
+        )}
 
         {/* Managed Connections */}
-        {connections.length > 0 && (
+        {initialLoading ? (
+          <div className="space-y-3">
+            <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
+              Managed Connections
+            </div>
+            {[0, 1].map((i) => <ConnectionCardSkeleton key={i} />)}
+          </div>
+        ) : connections.length > 0 && (
           <div className="space-y-3">
             <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
               Managed Connections
@@ -461,7 +477,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         )}
 
         {/* External Active Mounts */}
-        {externalMounts.length > 0 && (
+        {!initialLoading && externalMounts.length > 0 && (
           <div className="space-y-3">
             <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
               External Mounts (running outside this app)
@@ -516,7 +532,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         )}
 
         {/* Unmanaged Rclone Remotes */}
-        {unmanagedRemotes.length > 0 && (
+        {!initialLoading && unmanagedRemotes.length > 0 && (
           <div className="space-y-3">
             <div className="text-[11px] text-text-tertiary uppercase tracking-wider font-medium">
               Rclone Remotes (in rclone config, not managed here)
@@ -568,7 +584,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         )}
 
         {/* Empty State */}
-        {connections.length === 0 && externalMounts.length === 0 && unmanagedRemotes.length === 0 && (
+        {!initialLoading && connections.length === 0 && externalMounts.length === 0 && unmanagedRemotes.length === 0 && (
           <Card className="flex flex-col items-center justify-center text-center py-20 px-8">
             <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-accent-blue/15 to-accent-purple/15 border border-white/[0.08] flex items-center justify-center mb-6 shadow-[0_8px_24px_rgba(59,130,246,0.12)]">
               <HardDrives size={32} className="text-accent-blue" weight="duotone" />
