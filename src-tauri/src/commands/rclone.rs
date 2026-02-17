@@ -4,7 +4,7 @@ use tauri::command;
 use tauri_plugin_shell::ShellExt;
 use std::sync::Mutex;
 use std::collections::HashMap;
-use crate::config::{Connection, MountStatus, MountState, NetworkMode, SpeedProfile};
+use crate::config::{Connection, MountStatus, MountState, NetworkMode};
 use serde_json;
 
 // Global state to track active mounts
@@ -275,7 +275,7 @@ pub async fn mount_drive(
     }
 
     // Spawn rclone process
-    let child = app
+    let (_rx, child) = app
         .shell()
         .command("rclone")
         .args(&args)
