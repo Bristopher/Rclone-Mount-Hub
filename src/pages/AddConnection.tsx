@@ -207,7 +207,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
       }
 
       const reachable = await invoke<boolean>("ping_port", {
-        host: testHost,
+        ip: testHost,
         port: testPort,
         timeoutMs: 3000,
       });

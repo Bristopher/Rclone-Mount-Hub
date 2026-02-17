@@ -3,17 +3,33 @@ import { Toaster } from "sonner";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Dashboard } from "./pages/Dashboard";
 import { AddConnection } from "./pages/AddConnection";
+import { EditConnection } from "./pages/EditConnection";
 import { Settings } from "./pages/Settings";
 import { Export } from "./pages/Export";
 import { SpeedTest } from "./pages/SpeedTest";
 import { LogPanel } from "./components/LogPanel";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { useSettingsStore } from "./lib/store";
+import { useSettingsStore, useConnectionStore } from "./lib/store";
+import type { Connection } from "./lib/types";
 
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
+  const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const { settings } = useSettingsStore();
+  const { connections } = useConnectionStore();
+
+  const navigateTo = (page: string, connectionId?: string) => {
+    if (page === "edit" && connectionId) {
+      const conn = connections.find((c) => c.id === connectionId);
+      if (conn) {
+        setEditingConnection(conn);
+        setCurrentPage("edit");
+      }
+    } else {
+      setCurrentPage(page);
+    }
+  };
 
   // Handle close to tray
   useEffect(() => {
@@ -35,9 +51,13 @@ function App() {
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={navigateTo} />;
       case "add":
-        return <AddConnection onNavigate={setCurrentPage} />;
+        return <AddConnection onNavigate={navigateTo} />;
+      case "edit":
+        return editingConnection
+          ? <EditConnection connection={editingConnection} onNavigate={navigateTo} />
+          : <Dashboard onNavigate={navigateTo} />;
       case "settings":
         return <Settings />;
       case "export":
@@ -45,13 +65,13 @@ function App() {
       case "speedtest":
         return <SpeedTest />;
       default:
-        return <Dashboard onNavigate={setCurrentPage} />;
+        return <Dashboard onNavigate={navigateTo} />;
     }
   };
 
   return (
     <>
-      <AppLayout currentPage={currentPage} onNavigate={setCurrentPage}>
+      <AppLayout currentPage={currentPage} onNavigate={navigateTo}>
         {renderPage()}
       </AppLayout>
       <Toaster position="bottom-right" theme="dark" />

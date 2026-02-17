@@ -275,6 +275,18 @@ pub async fn mount_drive(
         args.push("--network-mode=false".to_string());
     }
 
+    // Check if drive letter is already in use before spawning
+    #[cfg(target_os = "windows")]
+    {
+        let drive_path = format!("{}:\\", connection.drive_letter.to_uppercase());
+        if std::path::Path::new(&drive_path).exists() {
+            return Err(format!(
+                "Drive {}:\\ is already in use. Unmount it first or choose a different drive letter.",
+                connection.drive_letter.to_uppercase()
+            ));
+        }
+    }
+
     // Spawn rclone process
     let (_rx, child) = app
         .shell()
@@ -284,6 +296,15 @@ pub async fn mount_drive(
         .map_err(|e| format!("Failed to spawn rclone: {}", e))?;
 
     let pid = child.pid();
+
+    // Wait briefly and verify the process survived (catches immediate failures like drive-in-use)
+    std::thread::sleep(std::time::Duration::from_millis(800));
+    if !is_process_alive(pid) {
+        return Err(format!(
+            "rclone exited immediately — drive {}:\\ may be in use, or check your connection settings.",
+            connection.drive_letter.to_uppercase()
+        ));
+    }
 
     // Store mount info
     insert_mount(connection.id.clone(), MountInfo {

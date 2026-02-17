@@ -11,6 +11,7 @@ import {
   Trash,
   CloudArrowDown,
   DesktopTower,
+  PencilSimple,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -22,7 +23,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 
 interface DashboardProps {
-  onNavigate?: (page: string) => void;
+  onNavigate?: (page: string, connectionId?: string) => void;
 }
 
 interface DriverVersions {
@@ -53,11 +54,15 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [externalMounts, setExternalMounts] = useState<ExternalMount[]>([]);
   const [unmanagedRemotes, setUnmanagedRemotes] = useState<RcloneRemote[]>([]);
 
+  // Run auto-mount only once on initial mount, not on every connections change
   useEffect(() => {
     checkDrivers();
+    autoMountConnections();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     refreshStatuses();
     refreshExternalMounts();
-    autoMountConnections();
 
     const interval = setInterval(() => {
       refreshStatuses();
@@ -67,18 +72,31 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   }, [connections]);
 
   const autoMountConnections = async () => {
+    // Fetch external mounts first so we don't try to mount already-occupied drive letters
+    let externals: ExternalMount[] = [];
+    try {
+      externals = await invoke<ExternalMount[]>("list_external_rclone_mounts");
+    } catch {
+      // ignore
+    }
+    const occupiedDrives = new Set(
+      externals.map((m) => m.mount_point.replace(":", "").toUpperCase())
+    );
+
     for (const conn of connections) {
-      if (conn.auto_mount) {
-        try {
-          const status = await invoke<MountStatus>("get_mount_status", {
-            connectionId: conn.id,
-          });
-          if (status.state !== "mounted") {
-            await handleMount(conn);
-          }
-        } catch (err) {
-          console.error(`Failed to auto-mount ${conn.name}:`, err);
+      if (!conn.auto_mount) continue;
+      // Skip if drive letter is already in use externally
+      if (occupiedDrives.has(conn.drive_letter.toUpperCase())) continue;
+
+      try {
+        const status = await invoke<MountStatus>("get_mount_status", {
+          connectionId: conn.id,
+        });
+        if (status.state !== "mounted") {
+          await handleMount(conn);
         }
+      } catch (err) {
+        console.error(`Failed to auto-mount ${conn.name}:`, err);
       }
     }
   };
@@ -149,7 +167,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         console.error("Failed to send notification:", err);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : `Failed to mount ${conn.name}`;
+      const errorMsg = err instanceof Error ? err.message : (typeof err === "string" ? err : `Failed to mount ${conn.name}`);
       addLog("error", `Mount failed: ${errorMsg}`, "mounts");
       toast.error(errorMsg);
     } finally {
@@ -179,7 +197,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         console.error("Failed to send notification:", err);
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : `Failed to unmount ${conn.name}`;
+      const errorMsg = err instanceof Error ? err.message : (typeof err === "string" ? err : `Failed to unmount ${conn.name}`);
       addLog("error", `Unmount failed: ${errorMsg}`, "mounts");
       toast.error(errorMsg);
     } finally {
@@ -417,8 +435,16 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={() => onNavigate?.("edit", conn.id)}
+                        title="Edit connection"
+                      >
+                        <PencilSimple size={14} weight="bold" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => handleDelete(conn)}
-                        className="gap-1.5"
+                        title="Delete connection"
                       >
                         <Trash size={14} weight="bold" />
                       </Button>

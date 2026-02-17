@@ -6,17 +6,21 @@ use serde::{Deserialize, Serialize};
 pub struct Connection {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub remote_type: String, // rclone remote type: webdav, sftp, smb, s3, ftp
     pub local_ip: String,
     pub tailscale_ip: String,
     pub port: u16,
     pub drive_letter: String,
-    pub protocol: String, // "webdav"
+    pub protocol: String,
     pub username: String,
     // Password is NOT stored here - it's in rclone's config
     pub network_mode: NetworkMode,
     pub speed_profile: SpeedProfile,
     pub auto_mount: bool,
-    pub sort_order: u32,
+    pub sort_order: i64, // u32 overflows Date.now() values
     pub created_at: String, // ISO timestamp
 }
 
