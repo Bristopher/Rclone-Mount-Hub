@@ -1,4 +1,6 @@
 import { clsx } from "clsx";
+import { CaretUp, CaretDown, Terminal } from "phosphor-react";
+import { useLogStore } from "../../lib/logStore";
 
 interface StatusBarProps {
   mountedCount: number;
@@ -6,6 +8,11 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ mountedCount, networkStatus }: StatusBarProps) {
+  const { isOpen, toggleOpen, logs, filter } = useLogStore();
+  const filteredLogs = filter === "all"
+    ? logs
+    : logs.filter(log => log.category === filter);
+
   return (
     <div className="h-[26px] px-3 bg-bg-base/80 backdrop-blur-md border-t border-white/[0.06] flex items-center justify-between text-[11px] text-text-tertiary select-none">
       <div className="flex items-center gap-3">
@@ -32,7 +39,31 @@ export function StatusBar({ mountedCount, networkStatus }: StatusBarProps) {
         </div>
       </div>
 
-      <span className="opacity-50">v0.1.0</span>
+      <div className="flex items-center gap-3">
+        {/* Log Toggle Button */}
+        <button
+          onClick={toggleOpen}
+          className="flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-white/[0.05] transition-colors group"
+        >
+          <Terminal size={12} weight="duotone" className="text-accent-blue" />
+          <span className="group-hover:text-text-primary transition-colors">
+            {isOpen ? "Hide Logs" : "Show Logs"}
+          </span>
+          {!isOpen && logs.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full bg-accent-blue/20 text-accent-blue text-[10px] font-bold">
+              {filteredLogs.length}
+            </span>
+          )}
+          {isOpen ? (
+            <CaretDown size={12} weight="bold" className="text-accent-blue" />
+          ) : (
+            <CaretUp size={12} weight="bold" className="text-accent-blue" />
+          )}
+        </button>
+
+        <div className="w-px h-3 bg-white/[0.08]" />
+        <span className="opacity-50">v0.1.0</span>
+      </div>
     </div>
   );
 }
