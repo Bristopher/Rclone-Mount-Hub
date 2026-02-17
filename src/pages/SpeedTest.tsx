@@ -50,7 +50,7 @@ export function SpeedTest() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await invoke<SpeedTestResult>("speedtest_run_speed_test", {
+      const res = await invoke<SpeedTestResult>("run_speed_test", {
         driveLetter: selectedDrive,
         fileSizeMb: fileSize,
       });
@@ -72,7 +72,7 @@ export function SpeedTest() {
     setAnalyzingPath(true);
     setPathResult(null);
     try {
-      const res = await invoke<NetworkPathResult>("speedtest_analyze_network_path", {
+      const res = await invoke<NetworkPathResult>("analyze_network_path", {
         targetIp,
       });
       setPathResult(res);
@@ -89,7 +89,7 @@ export function SpeedTest() {
     setBenchmarkingDisk(true);
     setDiskSpeed(null);
     try {
-      const speed = await invoke<number>("speedtest_test_local_disk_speed");
+      const speed = await invoke<number>("test_local_disk_speed");
       setDiskSpeed(speed);
       toast.success("Disk benchmark completed");
     } catch (err) {
