@@ -200,37 +200,74 @@ pub async fn install_rclone(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[command]
-pub async fn install_winfsp(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn install_winfsp(_app: tauri::AppHandle) -> Result<(), String> {
+    // This is kept for API compatibility but WinFsp is now installed via download_and_launch_winfsp_installer
+    Err("Use download_and_launch_winfsp_installer instead".to_string())
+}
+
+#[command]
+pub async fn download_and_launch_winfsp_installer(app: tauri::AppHandle) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        // Ensure scoop is installed and updated
-        ensure_scoop_installed(&app).await?;
+        use std::process::Command;
 
-        let output = app
+        // Fetch latest release info from GitHub API
+        let api_output = app
             .shell()
             .command("powershell")
-            .args(["-Command", "scoop install winfsp-np"])
+            .args([
+                "-Command",
+                r#"
+                $response = Invoke-RestMethod -Uri 'https://api.github.com/repos/winfsp/winfsp/releases/latest' -UseBasicParsing;
+                $asset = $response.assets | Where-Object { $_.name -like '*.msi' -and $_.name -notlike '*arm*' } | Select-Object -First 1;
+                Write-Output "$($asset.browser_download_url)|$($asset.name)|$($response.tag_name)"
+                "#,
+            ])
             .output()
             .await
-            .map_err(|e| format!("Failed to execute scoop: {}", e))?;
+            .map_err(|e| format!("Failed to fetch release info: {}", e))?;
 
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = String::from_utf8_lossy(&api_output.stdout);
+        let trimmed = stdout.trim();
 
-            // Combine stderr and stdout for better error messages
-            let error_msg = if !stderr.is_empty() {
-                stderr.to_string()
-            } else if !stdout.is_empty() {
-                stdout.to_string()
-            } else {
-                "Unknown error occurred".to_string()
-            };
-
-            return Err(format!("WinFsp installation failed: {}", error_msg.trim()));
+        if trimmed.is_empty() || !trimmed.contains('|') {
+            return Err("Failed to get WinFsp download URL from GitHub".to_string());
         }
 
-        Ok(())
+        let parts: Vec<&str> = trimmed.split('|').collect();
+        let download_url = parts[0];
+        let file_name = if parts.len() > 1 { parts[1] } else { "winfsp.msi" };
+        let version = if parts.len() > 2 { parts[2] } else { "unknown" };
+
+        // Download to temp directory
+        let temp_path = format!("{}\\{}", std::env::temp_dir().to_string_lossy(), file_name);
+
+        let download_output = app
+            .shell()
+            .command("powershell")
+            .args([
+                "-Command",
+                &format!(
+                    "Invoke-WebRequest -Uri '{}' -OutFile '{}' -UseBasicParsing",
+                    download_url, temp_path
+                ),
+            ])
+            .output()
+            .await
+            .map_err(|e| format!("Failed to download installer: {}", e))?;
+
+        if !download_output.status.success() {
+            let stderr = String::from_utf8_lossy(&download_output.stderr);
+            return Err(format!("Download failed: {}", stderr.trim()));
+        }
+
+        // Launch the installer (user goes through wizard)
+        Command::new("msiexec")
+            .args(["/i", &temp_path])
+            .spawn()
+            .map_err(|e| format!("Failed to launch installer: {}", e))?;
+
+        Ok(version.to_string())
     }
 
     #[cfg(not(target_os = "windows"))]
