@@ -13,6 +13,40 @@ pub struct DriverVersions {
 }
 
 #[command]
+pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let autostart_manager = app.autostart();
+    autostart_manager
+        .enable()
+        .map_err(|e| format!("Failed to enable autostart: {}", e))?;
+
+    Ok(())
+}
+
+#[command]
+pub async fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let autostart_manager = app.autostart();
+    autostart_manager
+        .disable()
+        .map_err(|e| format!("Failed to disable autostart: {}", e))?;
+
+    Ok(())
+}
+
+#[command]
+pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let autostart_manager = app.autostart();
+    autostart_manager
+        .is_enabled()
+        .map_err(|e| format!("Failed to check autostart status: {}", e))
+}
+
+#[command]
 pub async fn install_rclone(app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
