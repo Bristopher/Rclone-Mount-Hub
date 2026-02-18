@@ -49,7 +49,7 @@ src-tauri/target/release/bundle/
 ### Build only the NSIS installer (faster, recommended)
 
 ```bash
-pnpm tauri build -- --bundles nsis
+pnpm tauri build --bundles nsis
 ```
 
 Skips MSI generation. First build takes several minutes while Rust compiles from scratch; subsequent builds are much faster.
