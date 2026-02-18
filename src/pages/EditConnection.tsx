@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   HardDrive,
   Globe,
@@ -12,6 +12,8 @@ import {
   Desktop,
   Database,
   FloppyDisk,
+  CaretLeft,
+  CaretRight,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -46,6 +48,7 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
   const [name, setName] = useState(connection.name);
   const [description, setDescription] = useState(connection.description || "");
   const [driveLetter, setDriveLetter] = useState(connection.drive_letter);
+  const [availableLetters, setAvailableLetters] = useState<string[]>([]);
   const [host, setHost] = useState(connection.local_ip);
   const [tailscaleIp, setTailscaleIp] = useState(connection.tailscale_ip || "");
   const [port, setPort] = useState(String(connection.port));
@@ -55,6 +58,26 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
   const [speedProfile, setSpeedProfile] = useState(connection.speed_profile);
   const [autoMount, setAutoMount] = useState(connection.auto_mount);
   const [webdavVendor, setWebdavVendor] = useState("copyparty");
+
+  useEffect(() => {
+    invoke<string[]>("get_available_drives").then((letters) => {
+      // Include the currently assigned letter even if "in use" by this connection
+      const withCurrent = letters.includes(connection.drive_letter)
+        ? letters
+        : [...letters, connection.drive_letter].sort();
+      setAvailableLetters(withCurrent);
+    }).catch(() => {});
+  }, []);
+
+  const navigateLetter = (dir: 1 | -1) => {
+    if (availableLetters.length === 0) return;
+    const idx = availableLetters.indexOf(driveLetter);
+    if (idx === -1) {
+      setDriveLetter(dir === 1 ? availableLetters[0] : availableLetters[availableLetters.length - 1]);
+    } else {
+      setDriveLetter(availableLetters[(idx + dir + availableLetters.length) % availableLetters.length]);
+    }
+  };
 
   const remoteType = connection.remote_type || "webdav";
 
@@ -213,16 +236,45 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
                   value={name}
                   onChange={(e) => { setName(e.target.value); setTestResult(null); }}
                 />
-                <Input
-                  label="Drive Letter"
-                  maxLength={1}
-                  value={driveLetter}
-                  onChange={(e) => setDriveLetter(e.target.value.toUpperCase())}
-                />
+                {/* Drive letter picker */}
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Drive Letter
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => navigateLetter(-1)}
+                      disabled={availableLetters.length === 0}
+                      className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors disabled:opacity-30"
+                    >
+                      <CaretLeft size={13} weight="bold" />
+                    </button>
+                    <input
+                      maxLength={1}
+                      value={driveLetter}
+                      onChange={(e) => setDriveLetter(e.target.value.toUpperCase())}
+                      className="w-12 h-9 text-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-[15px] font-semibold text-text-primary focus:outline-none focus:border-accent-blue/50 uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigateLetter(1)}
+                      disabled={availableLetters.length === 0}
+                      className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors disabled:opacity-30"
+                    >
+                      <CaretRight size={13} weight="bold" />
+                    </button>
+                    {availableLetters.length > 0 && (
+                      <span className="text-[11px] text-text-tertiary ml-1">
+                        {availableLetters.length} free
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <Input
                 label="Description (optional)"
-                placeholder="e.g., Unraid main storage"
+                placeholder="e.g., main storage, media share"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />

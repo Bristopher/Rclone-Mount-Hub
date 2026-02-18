@@ -297,7 +297,7 @@ export function SpeedTest() {
             <div className="space-y-4">
               <Input
                 label="Target IP Address"
-                placeholder="192.168.1.x"
+                placeholder="192.168.x.x"
                 value={targetIp}
                 onChange={(e) => setTargetIp(e.target.value)}
               />

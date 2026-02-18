@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   HardDrive,
   Globe,
@@ -11,6 +11,8 @@ import {
   Cloud,
   Desktop,
   Database,
+  CaretLeft,
+  CaretRight,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -88,14 +90,15 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [driveLetter, setDriveLetter] = useState("Z");
+  const [availableLetters, setAvailableLetters] = useState<string[]>([]);
   const [networkMode, setNetworkMode] = useState<"auto" | "local" | "tailscale">("auto");
   const [speedProfile, setSpeedProfile] = useState<"max" | "balanced" | "low">("balanced");
   const [autoMount, setAutoMount] = useState(true);
 
   // WebDAV / SFTP / FTP / SMB fields
-  const [host, setHost] = useState("192.168.1.x");
+  const [host, setHost] = useState("");
   const [tailscaleIp, setTailscaleIp] = useState("");
-  const [port, setPort] = useState("80");
+  const [port, setPort] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [webdavVendor, setWebdavVendor] = useState("copyparty");
@@ -115,6 +118,28 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
     smb: "445",
     s3: "",
     ftp: "21",
+  };
+
+  useEffect(() => {
+    invoke<string[]>("get_available_drives").then((letters) => {
+      setAvailableLetters(letters);
+      // If default "Z" isn't available, pick the last available letter
+      if (letters.length > 0 && !letters.includes("Z")) {
+        setDriveLetter(letters[letters.length - 1]);
+      }
+    }).catch(() => {});
+    // Set initial port based on default remote type
+    setPort(defaultPorts["webdav"]);
+  }, []);
+
+  const navigateLetter = (dir: 1 | -1) => {
+    if (availableLetters.length === 0) return;
+    const idx = availableLetters.indexOf(driveLetter);
+    if (idx === -1) {
+      setDriveLetter(dir === 1 ? availableLetters[0] : availableLetters[availableLetters.length - 1]);
+    } else {
+      setDriveLetter(availableLetters[(idx + dir + availableLetters.length) % availableLetters.length]);
+    }
   };
 
   const handleTypeChange = (type: RemoteTypeId) => {
@@ -347,21 +372,49 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Connection Name"
-                  placeholder="e.g., MyNAS, Media Server"
+                  placeholder="e.g., Home Server, NAS"
                   value={name}
                   onChange={(e) => { setName(e.target.value); setTestResult(null); }}
                 />
-                <Input
-                  label="Drive Letter"
-                  placeholder="Z"
-                  maxLength={1}
-                  value={driveLetter}
-                  onChange={(e) => setDriveLetter(e.target.value.toUpperCase())}
-                />
+                {/* Drive letter picker */}
+                <div>
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Drive Letter
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => navigateLetter(-1)}
+                      disabled={availableLetters.length === 0}
+                      className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors disabled:opacity-30"
+                    >
+                      <CaretLeft size={13} weight="bold" />
+                    </button>
+                    <input
+                      maxLength={1}
+                      value={driveLetter}
+                      onChange={(e) => setDriveLetter(e.target.value.toUpperCase())}
+                      className="w-12 h-9 text-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-[15px] font-semibold text-text-primary focus:outline-none focus:border-accent-blue/50 uppercase"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => navigateLetter(1)}
+                      disabled={availableLetters.length === 0}
+                      className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors disabled:opacity-30"
+                    >
+                      <CaretRight size={13} weight="bold" />
+                    </button>
+                    {availableLetters.length > 0 && (
+                      <span className="text-[11px] text-text-tertiary ml-1">
+                        {availableLetters.length} free
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
               <Input
                 label="Description (optional)"
-                placeholder="e.g., Unraid main storage, work NAS"
+                placeholder="e.g., main storage, media share"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
@@ -396,7 +449,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                   <div className="col-span-2">
                     <Input
                       label="Host / IP (LAN)"
-                      placeholder="192.168.1.x"
+                      placeholder="192.168.x.x"
                       value={host}
                       onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
                       hint="Local network address"
@@ -432,7 +485,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                   <div className="col-span-2">
                     <Input
                       label="Host / IP"
-                      placeholder="192.168.1.x"
+                      placeholder="192.168.x.x"
                       value={host}
                       onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
                     />
