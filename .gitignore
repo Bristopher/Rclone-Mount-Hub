@@ -212,3 +212,4 @@ src-tauri/bin/
 
 *.claude*
 .vscode/commands/
+*.myArchive*
