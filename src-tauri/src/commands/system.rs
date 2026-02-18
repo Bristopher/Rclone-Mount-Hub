@@ -590,7 +590,7 @@ pub async fn check_driver_updates(app: tauri::AppHandle) -> Result<String, Strin
 
 /// Change this to your GitHub releases URL once you publish releases, e.g.:
 /// "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download"
-const UPDATE_FEED_URL: &str = "https://github.com/OWNER/REPO/releases/latest/download";
+const UPDATE_FEED_URL: &str = "https://github.com/Bristopher/Rclone-Mount-Hub/releases/latest/download";
 
 #[derive(serde::Serialize)]
 pub struct AppUpdateInfo {
