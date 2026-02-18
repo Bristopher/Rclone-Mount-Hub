@@ -6,9 +6,12 @@ import {
   GearSix,
   Export,
   CirclesFour,
+  Terminal,
 } from "phosphor-react";
 import { clsx } from "clsx";
 import { invoke } from "@tauri-apps/api/core";
+import { useMountSummaryStore } from "../../lib/store";
+import { toast } from "sonner";
 
 interface SidebarProps {
   currentPage: string;
@@ -79,17 +82,10 @@ interface DriverVersions {
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
-  const [activeMountCount, setActiveMountCount] = useState(0);
+  const { mountedCount } = useMountSummaryStore();
 
   useEffect(() => {
     loadDriverVersions();
-    refreshActiveMounts();
-
-    const interval = setInterval(() => {
-      loadDriverVersions();
-      refreshActiveMounts();
-    }, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   const loadDriverVersions = async () => {
@@ -101,18 +97,13 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
     }
   };
 
-  const refreshActiveMounts = async () => {
+  const handleOpenWebUI = async () => {
     try {
-      const [managedStatuses, externalMounts] = await Promise.all([
-        invoke<Record<string, { state: string }>>("get_all_mount_statuses"),
-        invoke<unknown[]>("list_external_rclone_mounts"),
-      ]);
-      const managedActive = Object.values(managedStatuses).filter(
-        (s) => s.state === "mounted"
-      ).length;
-      setActiveMountCount(managedActive + externalMounts.length);
-    } catch {
-      // silently ignore
+      await invoke("open_rclone_web_ui");
+      toast.success("Rclone Web UI launched");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Failed to launch Web UI: ${msg}`);
     }
   };
 
@@ -129,7 +120,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               Mount Hub
             </h2>
             <p className="text-[11px] text-text-tertiary leading-tight">
-              {activeMountCount} active
+              {mountedCount} active
             </p>
           </div>
         </div>
@@ -162,6 +153,25 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               onClick={() => onNavigate(item.id)}
             />
           ))}
+        </nav>
+
+        <SectionLabel>Rclone</SectionLabel>
+        <nav className="flex flex-col gap-0.5">
+          <button
+            onClick={handleOpenWebUI}
+            className={clsx(
+              "flex items-center gap-2.5 w-full px-2.5 py-[7px] rounded-md text-[13px] font-medium transition-all duration-150 cursor-pointer",
+              "outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50",
+              "text-text-secondary hover:text-text-primary hover:bg-white/[0.04] active:bg-white/[0.07]"
+            )}
+          >
+            <Terminal
+              size={18}
+              weight="regular"
+              className="flex-shrink-0 text-text-tertiary transition-colors duration-150"
+            />
+            Rclone Web UI
+          </button>
         </nav>
       </div>
 
