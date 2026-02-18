@@ -40,9 +40,9 @@ This runs:
 ```
 src-tauri/target/release/bundle/
 ├── nsis/
-│   └── Rclone Mount Hub_0.1.0_x64-setup.exe   ← distribute this
+│   └── Rclone Mount Hub_0.1.1_x64-setup.exe   ← distribute this
 ├── msi/
-│   └── Rclone Mount Hub_0.1.0_x64_en-US.msi
+│   └── Rclone Mount Hub_0.1.1_x64_en-US.msi
 └── Rclone Mount Hub.exe                         ← portable (no installer)
 ```
 
@@ -66,14 +66,18 @@ Skips MSI generation. First build takes several minutes while Rust compiles from
 
 ---
 
-## Bumping the version
+## Updating / distributing a new version
 
-Edit **two** files:
+Re-running the NSIS installer over an existing install will **update in place** — it replaces the binaries and updates the Add/Remove Programs entry. Users do not need to uninstall first.
 
-```
-src-tauri/tauri.conf.json   →  "version": "x.y.z"
-src-tauri/Cargo.toml        →  version = "x.y.z"
-```
+Workflow:
+1. Bump the version in **two** files:
+   ```
+   src-tauri/tauri.conf.json   →  "version": "x.y.z"
+   src-tauri/Cargo.toml        →  version = "x.y.z"
+   ```
+2. Build: `pnpm tauri build --bundles nsis`
+3. Distribute the new `Rclone Mount Hub_x.y.z_x64-setup.exe`
 
 ---
 
