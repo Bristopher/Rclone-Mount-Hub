@@ -4,7 +4,6 @@ use tauri::command;
 use tauri_plugin_shell::ShellExt;
 use std::sync::Mutex;
 use std::collections::HashMap;
-use std::process::Command;
 use crate::config::{Connection, MountStatus, MountState, NetworkMode};
 use serde_json;
 
@@ -101,7 +100,6 @@ pub async fn check_winfsp_installed() -> Result<bool, String> {
     // Check Windows registry for WinFsp
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         let output = crate::util::cmd("reg")
             .args([
                 "query",
@@ -207,8 +205,6 @@ pub async fn delete_remote(app: tauri::AppHandle, name: String) -> Result<(), St
 pub async fn get_available_drives() -> Result<Vec<String>, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
         // Get list of used drives
         let output = crate::util::cmd("wmic")
             .args(["logicaldisk", "get", "name"])
@@ -376,7 +372,6 @@ pub async fn unmount_drive(connection_id: String) -> Result<(), String> {
 
         #[cfg(target_os = "windows")]
         {
-            use std::process::Command;
             // Kill the rclone process by PID
             crate::util::cmd("taskkill")
                 .args(["/F", "/PID", &pid.to_string()])
@@ -470,7 +465,6 @@ pub async fn get_all_mount_statuses() -> Result<Vec<MountStatus>, String> {
 pub async fn unmount_external_mount(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
         let output = crate::util::cmd("taskkill")
             .args(["/F", "/PID", &pid.to_string()])
             .output()
