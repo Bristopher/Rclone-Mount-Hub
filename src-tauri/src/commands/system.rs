@@ -586,3 +586,55 @@ pub async fn check_driver_updates(app: tauri::AppHandle) -> Result<String, Strin
     }
 }
 
+// ── App self-update (Velopack) ────────────────────────────────────────────────
+
+/// Change this to your GitHub releases URL once you publish releases, e.g.:
+/// "https://github.com/YOUR_USERNAME/YOUR_REPO/releases/latest/download"
+const UPDATE_FEED_URL: &str = "https://github.com/OWNER/REPO/releases/latest/download";
+
+#[derive(serde::Serialize)]
+pub struct AppUpdateInfo {
+    pub available: bool,
+    pub version: Option<String>,
+}
+
+#[command]
+pub async fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[command]
+pub async fn check_app_update() -> Result<AppUpdateInfo, String> {
+    tokio::task::spawn_blocking(|| {
+        let source = velopack::sources::AutoSource::new(UPDATE_FEED_URL);
+        let um = velopack::UpdateManager::new(source, None, None)
+            .map_err(|e| e.to_string())?;
+        match um.check_for_updates().map_err(|e| e.to_string())? {
+            velopack::UpdateCheck::UpdateAvailable(info) => Ok(AppUpdateInfo {
+                available: true,
+                version: Some(info.TargetFullRelease.Version.clone()),
+            }),
+            _ => Ok(AppUpdateInfo { available: false, version: None }),
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[command]
+pub async fn apply_app_update() -> Result<(), String> {
+    tokio::task::spawn_blocking(|| {
+        let source = velopack::sources::AutoSource::new(UPDATE_FEED_URL);
+        let um = velopack::UpdateManager::new(source, None, None)
+            .map_err(|e| e.to_string())?;
+        if let velopack::UpdateCheck::UpdateAvailable(updates) =
+            um.check_for_updates().map_err(|e| e.to_string())?
+        {
+            um.download_updates(&updates, None).map_err(|e| e.to_string())?;
+            um.apply_updates_and_restart(&updates).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}

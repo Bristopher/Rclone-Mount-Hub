@@ -62,6 +62,10 @@ pub fn run() {
             commands::set_rclone_config_path,
             commands::get_rclone_config_path,
             commands::get_default_rclone_config_path,
+            // App update commands
+            commands::get_app_version,
+            commands::check_app_update,
+            commands::apply_app_update,
         ])
         .setup(|app| {
             // Create system tray menu

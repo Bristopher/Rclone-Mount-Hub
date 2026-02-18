@@ -13,6 +13,9 @@ import {
   FolderOpen,
   File,
   AppWindow,
+  Info,
+  CheckCircle,
+  WarningCircle,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -23,6 +26,7 @@ import { useLogStore } from "../lib/logStore";
 import { Check } from "phosphor-react";
 import type { SpeedProfile, NetworkMode } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { open as openFilePicker } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 
@@ -43,11 +47,15 @@ export function Settings() {
   const [winfspInstallerLaunched, setWinfspInstallerLaunched] = useState(false);
   const [verifyingWinfsp, setVerifyingWinfsp] = useState(false);
   const [defaultConfigPath, setDefaultConfigPath] = useState("");
+  const [appVersion, setAppVersion] = useState("");
+  const [updateStatus, setUpdateStatus] = useState<"idle" | "checking" | "available" | "up-to-date" | "updating">("idle");
+  const [availableVersion, setAvailableVersion] = useState<string | null>(null);
 
   useEffect(() => {
     loadDriverVersions();
     syncAutostart();
     invoke<string>("get_default_rclone_config_path").then(setDefaultConfigPath).catch(() => {});
+    getVersion().then(setAppVersion).catch(() => setAppVersion("unknown"));
   }, []);
 
   const syncAutostart = async () => {
@@ -203,6 +211,33 @@ export function Settings() {
       toast.error(errorMsg);
     } finally {
       setCheckingUpdates(false);
+    }
+  };
+
+  const handleCheckAppUpdate = async () => {
+    setUpdateStatus("checking");
+    try {
+      const result = await invoke<{ available: boolean; version: string | null }>("check_app_update");
+      if (result.available && result.version) {
+        setAvailableVersion(result.version);
+        setUpdateStatus("available");
+      } else {
+        setUpdateStatus("up-to-date");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to check for updates");
+      setUpdateStatus("idle");
+    }
+  };
+
+  const handleApplyAppUpdate = async () => {
+    setUpdateStatus("updating");
+    try {
+      await invoke("apply_app_update");
+      // apply_updates_and_restart restarts the app — this line won't be reached
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to apply update");
+      setUpdateStatus("available");
     }
   };
 
@@ -690,6 +725,82 @@ export function Settings() {
                 Could not load driver information.
               </div>
             )}
+          </Card>
+
+          {/* Section G - About & Updates */}
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+              <Info size={18} weight="duotone" className="text-accent-blue" />
+              About &amp; Updates
+            </h2>
+
+            <div className="flex items-center justify-between py-1">
+              <div>
+                <div className="text-[13px] font-medium text-text-primary mb-0.5">
+                  Rclone Mount Hub
+                </div>
+                <div className="text-[11px] text-text-tertiary font-mono">
+                  v{appVersion || "…"}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Status badge */}
+                {updateStatus === "up-to-date" && (
+                  <div className="flex items-center gap-1.5 text-accent-green text-[12px]">
+                    <CheckCircle size={14} weight="fill" />
+                    Up to date
+                  </div>
+                )}
+                {updateStatus === "available" && availableVersion && (
+                  <div className="flex items-center gap-1.5 text-accent-amber text-[12px]">
+                    <WarningCircle size={14} weight="fill" />
+                    v{availableVersion} available
+                  </div>
+                )}
+
+                {/* Update & Restart button — only shown when update is ready */}
+                {updateStatus === "available" && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={handleApplyAppUpdate}
+                    className="gap-1.5"
+                  >
+                    <Download size={14} weight="bold" />
+                    Update &amp; Restart
+                  </Button>
+                )}
+
+                {/* Check for Updates button */}
+                {updateStatus !== "available" && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleCheckAppUpdate}
+                    disabled={updateStatus === "checking" || updateStatus === "updating"}
+                    className="gap-1.5"
+                  >
+                    {updateStatus === "checking" ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-text-primary/30 border-t-text-primary rounded-full animate-spin" />
+                        Checking…
+                      </>
+                    ) : updateStatus === "updating" ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-text-primary/30 border-t-text-primary rounded-full animate-spin" />
+                        Updating…
+                      </>
+                    ) : (
+                      <>
+                        <CloudArrowUp size={14} weight="bold" />
+                        Check for Updates
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
           </Card>
 
           {/* Actions */}

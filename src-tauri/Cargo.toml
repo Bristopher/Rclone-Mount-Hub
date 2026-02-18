@@ -24,4 +24,5 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 tauri-plugin-mcp-bridge = "0.8.2"
+velopack = { version = "0.0", features = ["async"] }
 
