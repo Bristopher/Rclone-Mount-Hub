@@ -70,7 +70,7 @@ src-tauri/target/release/Rclone Mount Hub.exe
 **Step 2 — Package with Velopack:**
 
 ```bash
-cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "rclone-mount-hub.exe" --outputDir "Releases/0.1.2"
+cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "rclone-mount-hub.exe" --outputDir "Releases/v0.1.2"
 ```
 
 **Step 3 — Output:**
