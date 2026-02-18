@@ -70,7 +70,7 @@ src-tauri/target/release/Rclone Mount Hub.exe
 **Step 2 — Package with Velopack:**
 
 ```bash
-cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "Rclone Mount Hub.exe"
+cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "Rclone Mount Hub.exe" --outputDir "Releases/v0.1.2"
 ```
 
 **Step 3 — Output:**
@@ -109,7 +109,7 @@ Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub
 2. Build + package:
    ```bash
    cd src-tauri && pnpm tauri build
-   cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "target/release" --mainExe "Rclone Mount Hub.exe"
+   cd src-tauri && vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "target/release" --mainExe "Rclone Mount Hub.exe" --outputDir "Releases/vx.y.z"
    ```
 
 3. Create a GitHub Release tagged `vx.y.z` and upload all files from `releases/`
