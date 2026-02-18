@@ -54,24 +54,24 @@ vpk --version
 
 ### Build + package workflow
 
-**Step 1 — Compile the app** (must use the Tauri CLI so it embeds the frontend):
+**Step 1 — Compile the app:**
 
 ```bash
-pnpm tauri build --bundles nsis
+cd src-tauri
+pnpm tauri build
 ```
 
 > **Important:** Do NOT use `cargo build --release` directly — Tauri won't embed the frontend and the installed app will show a "localhost refused to connect" error.
 
 The compiled exe lands at:
 ```
-src-tauri/target/release/rclone-mount-hub.exe
+src-tauri/target/release/Rclone Mount Hub.exe
 ```
-(The NSIS installer in `bundle/nsis/` is a side-effect you can ignore.)
 
 **Step 2 — Package with Velopack:**
 
 ```bash
-vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "src-tauri/target/release" --mainExe "rclone-mount-hub.exe"
+vpk pack --packId "Rclone Mount Hub" --packVersion 0.1.2 --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
 ```
 
 > On Windows use `^` instead of `\` for line continuation, or put it all on one line.
@@ -111,8 +111,9 @@ Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub
 
 2. Build + package:
    ```bash
-   pnpm tauri build --bundles nsis
-   vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "src-tauri/target/release" --mainExe "rclone-mount-hub.exe"
+   cd src-tauri
+   pnpm tauri build
+   vpk pack --packId "Rclone Mount Hub" --packVersion x.y.z --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
    ```
 
 3. Create a GitHub Release tagged `vx.y.z` and upload all files from `releases/`
