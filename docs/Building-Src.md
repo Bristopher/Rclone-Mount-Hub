@@ -68,7 +68,7 @@ src-tauri/target/release/Rclone Mount Hub.exe
 **Step 2 — Package with Velopack:**
 
 ```bash
-vpk pack --packId "Rclone Mount Hub" --packVersion 0.1.1 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
+vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.1 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
 ```
 
 > On Windows use `^` instead of `\` for line continuation, or put it all on one line.
@@ -81,6 +81,16 @@ src-tauri\Releases
 ├── RcloneMountHub-0.1.1-full.nupkg       ← full update package
 ├── RcloneMountHub-0.1.0-delta.nupkg      ← delta (if prior version exists)
 └── RELEASES                               ← update feed index
+
+
+**Safe to Rename:**
+*   ✅ `com.cbuzi.rclone-mount-hub-win-Setup.exe` -> `RcloneMountHub-Setup.exe`
+*   ✅ `com.cbuzi.rclone-mount-hub-win-Portable.zip` -> `RcloneMountHub-Portable.zip`
+
+**DO NOT Rename (Updates will break):**
+*   ❌ `com.cbuzi...-full.nupkg`
+*   ❌ `RELEASES`
+*   ❌ `assets.win.json` / `releases.win.json`
 ```
 
 **Step 4 — Publish to GitHub Releases:**
