@@ -216,3 +216,4 @@ src-tauri/bin/
 # Personal archive / local history — never commit these
 .myArchive/
 .history/
+src-tauri/Releases/

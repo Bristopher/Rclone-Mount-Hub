@@ -2,13 +2,13 @@
 
 ## Prerequisites
 
-| Tool | Install |
-|------|---------|
-| **Rust** (stable) | https://rustup.rs |
-| **Node.js** (v18+) | https://nodejs.org |
-| **pnpm** | `npm i -g pnpm` |
-| **WebView2 Runtime** | Pre-installed on Windows 10/11. If missing: https://developer.microsoft.com/en-us/microsoft-edge/webview2/ |
-| **.NET 8 SDK** *(Velopack only)* | https://dotnet.microsoft.com/download — required to install the `vpk` CLI |
+| Tool                             | Install                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| **Rust** (stable)                | https://rustup.rs                                                                                          |
+| **Node.js** (v18+)               | https://nodejs.org                                                                                         |
+| **pnpm**                         | `npm i -g pnpm`                                                                                            |
+| **WebView2 Runtime**             | Pre-installed on Windows 10/11. If missing: https://developer.microsoft.com/en-us/microsoft-edge/webview2/ |
+| **.NET 8 SDK** *(Velopack only)* | https://dotnet.microsoft.com/download — required to install the `vpk` CLI                                  |
 
 ---
 
@@ -27,10 +27,10 @@ The app opens at `http://localhost:1820`. Rust changes rebuild automatically; fr
 
 There are two ways to package Rclone Mount Hub for distribution:
 
-| Method | Installer look | Auto-update | Delta updates | Extra tooling |
-|--------|---------------|-------------|---------------|---------------|
-| **Velopack** *(recommended)* | Clean, fast, silent | Built-in | Yes | .NET 8 SDK + `vpk` CLI |
-| **NSIS** *(Tauri built-in)* | Classic wizard | Manual re-download | No | None |
+| Method                       | Installer look      | Auto-update        | Delta updates | Extra tooling          |
+| ---------------------------- | ------------------- | ------------------ | ------------- | ---------------------- |
+| **Velopack** *(recommended)* | Clean, fast, silent | Built-in           | Yes           | .NET 8 SDK + `vpk` CLI |
+| **NSIS** *(Tauri built-in)*  | Classic wizard      | Manual re-download | No            | None                   |
 
 ---
 
@@ -68,11 +68,7 @@ src-tauri/target/release/Rclone Mount Hub.exe
 **Step 2 — Package with Velopack:**
 
 ```bash
-vpk pack \
-  --packId com.cbuzi.rclone-mount-hub \
-  --packVersion 0.1.1 \
-  --packDir "src-tauri/target/release" \
-  --mainExe "Rclone Mount Hub.exe"
+vpk pack --packId "Rclone Mount Hub" --packVersion 0.1.1 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
 ```
 
 > On Windows use `^` instead of `\` for line continuation, or put it all on one line.
@@ -80,7 +76,7 @@ vpk pack \
 **Step 3 — Output:**
 
 ```
-releases/
+src-tauri\Releases
 ├── RcloneMountHub-0.1.1-win-Setup.exe    ← distribute this
 ├── RcloneMountHub-0.1.1-full.nupkg       ← full update package
 ├── RcloneMountHub-0.1.0-delta.nupkg      ← delta (if prior version exists)
@@ -89,7 +85,7 @@ releases/
 
 **Step 4 — Publish to GitHub Releases:**
 
-Upload the entire `releases/` folder contents as assets on a new GitHub Release tagged `v0.1.1`. The in-app updater reads from this release automatically.
+Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub Release tagged `0.1.1`. The in-app updater reads from this release automatically.
 
 ### Releasing a new version
 
@@ -103,7 +99,7 @@ Upload the entire `releases/` folder contents as assets on a new GitHub Release 
 2. Build + package:
    ```bash
    pnpm tauri build --bundles none
-   vpk pack --packId com.cbuzi.rclone-mount-hub --packVersion x.y.z \
+   vpk pack --packId ?Rclone Mount Hub" --packVersion x.y.z \
      --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
    ```
 
@@ -189,13 +185,13 @@ src-tauri/Cargo.toml        →  version = "x.y.z"
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| `cargo: command not found` | Install Rust via https://rustup.rs and restart your terminal |
-| `error: linker 'link.exe' not found` | Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload |
-| WebView2 missing at runtime | Install the [WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) — already present on Windows 10 (1803+) / 11 |
-| NSIS not found | Tauri bundles its own NSIS copy — if it fails, run `cargo install tauri-cli` to update the CLI |
-| `vpk: command not found` | Run `dotnet tool install -g vpk` and ensure `~/.dotnet/tools` is on your PATH |
-| `vpk pack` fails with missing exe | Make sure you ran `pnpm tauri build --bundles none` first so the exe exists |
-| Build succeeds but app crashes on start | Check `src-tauri/target/release/` for a `.log` file, or run the exe from a terminal to see stderr |
-| In-app updater finds no updates | Check that `UPDATE_FEED_URL` in `system.rs` matches your actual GitHub repo and that release assets were uploaded correctly |
+| Problem                                 | Fix                                                                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cargo: command not found`              | Install Rust via https://rustup.rs and restart your terminal                                                                                          |
+| `error: linker 'link.exe' not found`    | Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload      |
+| WebView2 missing at runtime             | Install the [WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) — already present on Windows 10 (1803+) / 11 |
+| NSIS not found                          | Tauri bundles its own NSIS copy — if it fails, run `cargo install tauri-cli` to update the CLI                                                        |
+| `vpk: command not found`                | Run `dotnet tool install -g vpk` and ensure `~/.dotnet/tools` is on your PATH                                                                         |
+| `vpk pack` fails with missing exe       | Make sure you ran `pnpm tauri build --bundles none` first so the exe exists                                                                           |
+| Build succeeds but app crashes on start | Check `src-tauri/target/release/` for a `.log` file, or run the exe from a terminal to see stderr                                                     |
+| In-app updater finds no updates         | Check that `UPDATE_FEED_URL` in `system.rs` matches your actual GitHub repo and that release assets were uploaded correctly                           |
