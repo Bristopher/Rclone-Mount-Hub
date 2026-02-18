@@ -7,7 +7,7 @@
 [![React](https://img.shields.io/badge/frontend-React%2019-61dafb?logo=react&logoColor=black)](https://react.dev)
 [![Rust](https://img.shields.io/badge/backend-Rust-ce422b?logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Version](https://img.shields.io/badge/version-0.1.1-22c55e)](https://github.com/OWNER/REPO/releases)
-[![License](https://img.shields.io/badge/license-MIT-a855f7)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-a855f7)](LICENSE)
 
 ---
 
@@ -15,7 +15,7 @@
 
 Rclone Mount Hub lets you mount remote storage — NAS, Unraid, Nextcloud, SFTP, SMB, S3, FTP — as real Windows drive letters with a single click. No terminal, no scripts, no fuss. It wraps [rclone](https://rclone.org) in a clean, modern interface and handles connection management, smart network switching (LAN ↔ Tailscale), driver installation, performance tuning, and auto-update — all from one place.
 
-> **Originally this was a simple PowerShell script** (`Smart_Mount.ps1`) that I used to deploy rclone mounts on my own machine — automatically installing rclone and WinFsp, configuring WebDAV remotes, and setting up Windows autostart. As the setup grew more complex and needed to work for non-technical household members, that script evolved into this full desktop application.
+> **Originally this was a simple PowerShell script** that I used to deploy rclone mounts on my own machine and for family— automatically installing rclone and WinFsp, configuring WebDAV remotes, and setting up Windows autostart. As the setup grew more complex and needed to work for non-technical household members, that script evolved into this full desktop application.
 
 **Windows 11 (x64) only.** Rclone mounts as a Windows drive letter via [WinFsp](https://winfsp.dev), which is a Windows kernel driver — no macOS or Linux support.
 
@@ -23,18 +23,31 @@ Rclone Mount Hub lets you mount remote storage — NAS, Unraid, Nextcloud, SFTP,
 
 ## Table of Contents
 
-- [Purpose](#purpose)
-- [Features](#features)
-- [Platform & Requirements](#platform--requirements)
-- [Getting Started](#getting-started)
-- [Tech Stack](#tech-stack)
-- [Design](#design)
-- [Building from Source](#building-from-source)
-- [Updating](#updating)
-- [Documentation](#documentation)
-- [The Story](#the-story)
-- [Contributing](#contributing)
-- [License](#license)
+- [Rclone Mount Hub](#rclone-mount-hub)
+  - [Purpose](#purpose)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+    - [Mounting](#mounting)
+    - [Smart Networking](#smart-networking)
+    - [Performance Profiles](#performance-profiles)
+    - [Protocol Support](#protocol-support)
+    - [Diagnostics](#diagnostics)
+    - [Management](#management)
+    - [Windows Integration](#windows-integration)
+  - [Platform \& Requirements](#platform--requirements)
+  - [Getting Started](#getting-started)
+    - [Install](#install)
+    - [Updating](#updating)
+  - [Tech Stack](#tech-stack)
+    - [Desktop Shell](#desktop-shell)
+    - [Frontend](#frontend)
+    - [Tauri Plugins](#tauri-plugins)
+  - [Building from Source](#building-from-source)
+  - [Documentation](#documentation)
+  - [The Story](#the-story)
+    - [The Solution](#the-solution)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -55,12 +68,12 @@ Rclone Mount Hub lets you mount remote storage — NAS, Unraid, Nextcloud, SFTP,
 ### Performance Profiles
 Three tuned rclone flag presets selectable per connection:
 
-| | Max Speed | Balanced | Low Resource |
-|---|---|---|---|
-| VFS Cache | 50 GB | 10 GB | 2 GB |
-| Buffer | 512 MB | 256 MB | 64 MB |
-| Transfers | 16 | 8 | 4 |
-| Best for | 10Gbps LAN / Fiber | Daily use | Battery / slow WiFi |
+|           | Max Speed          | Balanced  | Low Resource        |
+| --------- | ------------------ | --------- | ------------------- |
+| VFS Cache | 50 GB              | 10 GB     | 2 GB                |
+| Buffer    | 512 MB             | 256 MB    | 64 MB               |
+| Transfers | 16                 | 8         | 4                   |
+| Best for  | 10Gbps LAN / Fiber | Daily use | Battery / slow WiFi |
 
 ### Protocol Support
 - **WebDAV** — Unraid (Copyparty), Nextcloud, ownCloud, SharePoint
@@ -92,11 +105,11 @@ Three tuned rclone flag presets selectable per connection:
 
 ## Platform & Requirements
 
-| | |
-|---|---|
-| **OS** | Windows 11 x64 |
+|                      |                                                                    |
+| -------------------- | ------------------------------------------------------------------ |
+| **OS**               | Windows 11 x64                                                     |
 | **Required drivers** | rclone + WinFsp — the app installs both automatically on first run |
-| **macOS / Linux** | Not supported |
+| **macOS / Linux**    | Not supported                                                      |
 
 ---
 
@@ -117,45 +130,34 @@ Re-run the installer over your existing installation (updates in place), or use 
 ## Tech Stack
 
 ### Desktop Shell
-| | |
-|---|---|
-| [Tauri 2](https://tauri.app) | Desktop shell — Rust backend, web frontend, ~5 MB binary |
+|                                   |                                                                     |
+| --------------------------------- | ------------------------------------------------------------------- |
+| [Tauri 2](https://tauri.app)      | Desktop shell — Rust backend, web frontend, ~5 MB binary            |
 | [Rust](https://www.rust-lang.org) | Backend: spawns rclone, network detection, tray, system integration |
-| [Velopack](https://velopack.io) | Installer and auto-update framework |
+| [Velopack](https://velopack.io)   | Installer and auto-update framework                                 |
 
 ### Frontend
-| | |
-|---|---|
-| [React 19](https://react.dev) | UI framework |
-| [TypeScript](https://www.typescriptlang.org) | Type safety |
-| [Vite 7](https://vitejs.dev) | Build tooling |
-| [Tailwind CSS v4](https://tailwindcss.com) | Utility styling with custom dark design tokens |
-| [Zustand](https://zustand-demo.pmnd.rs) | Persisted client state |
-| [Radix UI](https://www.radix-ui.com) | Accessible headless primitives |
-| [Framer Motion](https://www.framer.com/motion/) | Animations |
-| [dnd-kit](https://dndkit.com) | Drag-and-drop reordering |
-| [Phosphor Icons](https://phosphoricons.com) | Icon library |
-| [sonner](https://sonner.emilkowal.ski) | Toast notifications |
+|                                                 |                                                |
+| ----------------------------------------------- | ---------------------------------------------- |
+| [React 19](https://react.dev)                   | UI framework                                   |
+| [TypeScript](https://www.typescriptlang.org)    | Type safety                                    |
+| [Vite 7](https://vitejs.dev)                    | Build tooling                                  |
+| [Tailwind CSS v4](https://tailwindcss.com)      | Utility styling with custom dark design tokens |
+| [Zustand](https://zustand-demo.pmnd.rs)         | Persisted client state                         |
+| [Radix UI](https://www.radix-ui.com)            | Accessible headless primitives                 |
+| [Framer Motion](https://www.framer.com/motion/) | Animations                                     |
+| [dnd-kit](https://dndkit.com)                   | Drag-and-drop reordering                       |
+| [Phosphor Icons](https://phosphoricons.com)     | Icon library                                   |
+| [sonner](https://sonner.emilkowal.ski)          | Toast notifications                            |
 
 ### Tauri Plugins
-| | |
-|---|---|
-| `tauri-plugin-shell` | Spawn rclone processes |
-| `tauri-plugin-store` | Persist configs as JSON |
-| `tauri-plugin-autostart` | Windows startup registration |
+|                             |                               |
+| --------------------------- | ----------------------------- |
+| `tauri-plugin-shell`        | Spawn rclone processes        |
+| `tauri-plugin-store`        | Persist configs as JSON       |
+| `tauri-plugin-autostart`    | Windows startup registration  |
 | `tauri-plugin-notification` | OS-native toast notifications |
-| `tauri-plugin-dialog` | File / folder picker |
-
----
-
-## Design
-
-Modeled after [Spacedrive](https://spacedrive.com) — a deep dark glassmorphism interface designed to feel premium on Windows 11 while remaining visually distinct.
-
-- **Backgrounds:** zinc-950 base, zinc-900 surfaces, zinc-800 overlays
-- **Accents:** blue (primary), green (mounted), amber (connecting/warning), red (error), purple (Tailscale)
-- **Typography:** Inter — clean, modern, legible at small sizes
-- **Principles:** dark-first, high information density, obvious one-click actions, smooth transitions
+| `tauri-plugin-dialog`       | File / folder picker          |
 
 ---
 
@@ -174,9 +176,9 @@ pnpm tauri build --bundles nsis   # production NSIS installer
 
 ## Documentation
 
-| | |
-|---|---|
-| [docs/building.md](docs/building.md) | Build, bundle, distribute, version bumping |
+|                                              |                                               |
+| -------------------------------------------- | --------------------------------------------- |
+| [docs/building.md](docs/building.md)         | Build, bundle, distribute, version bumping    |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full architecture, data models, design system |
 
 ---
@@ -209,4 +211,13 @@ Issues, feature requests, and pull requests are welcome. If Windows SMB has also
 
 ## License
 
-MIT — do whatever you want with it.
+Rclone Mount Hub is open source under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+**What this means:**
+- You can use, modify, and distribute this software freely
+- If you distribute a modified version or offer it as a hosted service, you must open source your changes under the same license
+- You cannot take this code, close it up, and sell it as a proprietary product without releasing your changes
+
+**Commercial licensing:** If your organization needs to use or build on Rclone Mount Hub without the AGPL obligations (e.g. in a proprietary product), a commercial license is available — open an issue or reach out directly.
+
+Copyright © 2025 Bristopher. All rights reserved.
