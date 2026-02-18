@@ -2,6 +2,7 @@ import { TitleBar } from "./TitleBar";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { LogPanel } from "../LogPanel";
+import { useMountSummaryStore } from "../../lib/store";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -10,6 +11,8 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, currentPage, onNavigate }: AppLayoutProps) {
+  const { mountedCount, networkStatus } = useMountSummaryStore();
+
   return (
     <div className="flex flex-col h-screen w-screen bg-bg-base text-text-primary overflow-hidden">
       <TitleBar />
@@ -25,7 +28,7 @@ export function AppLayout({ children, currentPage, onNavigate }: AppLayoutProps)
         </main>
       </div>
 
-      <StatusBar mountedCount={0} networkStatus="offline" />
+      <StatusBar mountedCount={mountedCount} networkStatus={networkStatus} />
     </div>
   );
 }

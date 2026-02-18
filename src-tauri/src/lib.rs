@@ -56,6 +56,7 @@ pub fn run() {
             commands::show_window,
             commands::hide_window,
             commands::send_notification,
+            commands::update_tray_menu,
         ])
         .setup(|app| {
             // Create system tray menu
@@ -69,22 +70,32 @@ pub fn run() {
                 .build()?;
 
             // Create system tray
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .tooltip("Rclone Mount Hub")
                 .on_menu_event(move |app, event| {
-                    match event.id.as_ref() {
-                        "show" => {
-                            if let Some(window) = app.get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                    let id = event.id.as_ref();
+                    if id.starts_with("open-") {
+                        // "open-E" → open E:\ in Explorer
+                        let letter = &id["open-".len()..];
+                        let path = format!("{}:\\", letter);
+                        let _ = std::process::Command::new("explorer")
+                            .arg(&path)
+                            .spawn();
+                    } else {
+                        match id {
+                            "show" => {
+                                if let Some(window) = app.get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
+                            "quit" => {
+                                app.exit(0);
+                            }
+                            _ => {}
                         }
-                        "quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
                     }
                 })
                 .on_tray_icon_event(|tray, event| {

@@ -2,6 +2,19 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { AppSettings, Connection } from "./types";
 
+// Mount status summary store (written by Dashboard, read by StatusBar)
+interface MountSummaryStore {
+  mountedCount: number;
+  networkStatus: "local" | "tailscale" | "offline";
+  setMountSummary: (count: number, network: "local" | "tailscale" | "offline") => void;
+}
+
+export const useMountSummaryStore = create<MountSummaryStore>()((set) => ({
+  mountedCount: 0,
+  networkStatus: "offline",
+  setMountSummary: (mountedCount, networkStatus) => set({ mountedCount, networkStatus }),
+}));
+
 // Default settings matching AppSettings type
 const DEFAULT_SETTINGS: AppSettings = {
   start_with_windows: false,

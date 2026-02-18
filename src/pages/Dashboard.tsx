@@ -17,7 +17,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ConnectionCardSkeleton, StatCardsSkeleton } from "../components/ui/Skeleton";
-import { useConnectionStore } from "../lib/store";
+import { useConnectionStore, useMountSummaryStore } from "../lib/store";
 import { useLogStore } from "../lib/logStore";
 import type { Connection, MountStatus } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -49,36 +49,74 @@ interface RcloneRemote {
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { connections, remove } = useConnectionStore();
   const { addLog } = useLogStore();
+  const { setMountSummary } = useMountSummaryStore();
   const [mountStatuses, setMountStatuses] = useState<Record<string, MountStatus>>({});
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [externalMounts, setExternalMounts] = useState<ExternalMount[]>([]);
   const [unmanagedRemotes, setUnmanagedRemotes] = useState<RcloneRemote[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [timeSince, setTimeSince] = useState<string>("");
   const didAutoMount = useRef(false);
+
+  // Keep the "X seconds/minutes ago" label ticking every 5 s
+  useEffect(() => {
+    if (!lastRefreshed) return;
+    const update = () => {
+      const secs = Math.round((Date.now() - lastRefreshed.getTime()) / 1000);
+      if (secs < 5) setTimeSince("just now");
+      else if (secs < 60) setTimeSince(`${secs}s ago`);
+      else setTimeSince(`${Math.floor(secs / 60)}m ago`);
+    };
+    update();
+    const t = setInterval(update, 5000);
+    return () => clearInterval(t);
+  }, [lastRefreshed]);
 
   // Run auto-mount exactly once — useRef guard prevents StrictMode double-fire
   useEffect(() => {
-    checkDrivers();
     if (!didAutoMount.current) {
       didAutoMount.current = true;
-      autoMountConnections();
+      refreshAll().then(() => autoMountConnections());
+    } else {
+      refreshAll();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const init = async () => {
-      await Promise.all([refreshStatuses(), refreshExternalMounts()]);
+  const refreshAll = async () => {
+    try {
+      await Promise.all([checkDrivers(), refreshStatuses(), refreshExternalMounts()]);
+    } finally {
       setInitialLoading(false);
-    };
-    init();
+      setLastRefreshed(new Date());
+    }
+  };
 
-    const interval = setInterval(() => {
-      refreshStatuses();
-      refreshExternalMounts();
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [connections]);
+  // Push live counts to the global summary store AND update tray menu
+  useEffect(() => {
+    const mountedEntries = connections
+      .filter((c) => mountStatuses[c.id]?.state === "mounted")
+      .map<[string, string]>((c) => [c.name, c.drive_letter]);
+    const externalEntries = externalMounts.map<[string, string]>((m) => [
+      m.remote_name ? m.remote_name.replace(/:$/, "") : "External",
+      m.mount_point.replace(":", ""),
+    ]);
+    const allEntries = [...mountedEntries, ...externalEntries];
+
+    const total = allEntries.length;
+    const mountedVals = Object.values(mountStatuses).filter((s) => s.state === "mounted");
+    const network: "local" | "tailscale" | "offline" =
+      total === 0
+        ? "offline"
+        : mountedVals.some((s) => s.active_mode === "local") || externalMounts.length > 0
+        ? "local"
+        : "tailscale";
+    setMountSummary(total, network);
+
+    // Update system tray menu with active mounts
+    invoke("update_tray_menu", { mountEntries: allEntries }).catch(console.error);
+  }, [mountStatuses, externalMounts, connections, setMountSummary]);
 
   const autoMountConnections = async () => {
     // Fetch external mounts first so we don't try to mount already-occupied drive letters
@@ -290,14 +328,16 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {lastRefreshed && (
+              <span className="text-[12px] text-text-tertiary select-none">
+                Updated {timeSince}
+              </span>
+            )}
             <Button
               variant="ghost"
               size="sm"
               className="gap-1.5 text-[13px]"
-              onClick={() => {
-                refreshStatuses();
-                refreshExternalMounts();
-              }}
+              onClick={refreshAll}
             >
               <ArrowsClockwise size={15} weight="bold" />
               Refresh
@@ -314,8 +354,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </div>
         </div>
 
-        {/* Driver Warning */}
-        {!driversInstalled && (
+        {/* Driver Warning — only show once we have a result, to avoid false flash on load */}
+        {driverVersions !== null && !driversInstalled && (
           <Card className="p-4 bg-accent-amber/10 border-accent-amber/30">
             <div className="flex items-start gap-3">
               <Warning size={20} className="text-accent-amber mt-0.5" weight="bold" />
