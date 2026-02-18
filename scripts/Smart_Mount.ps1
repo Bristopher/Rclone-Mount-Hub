@@ -63,7 +63,8 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path","User") + ";" + 
 
 # 2. Config Manager
 $existingRemotes = rclone listremotes
-$remoteName = "MyNAS"
+$remoteName = Read-Host "Enter a name for this remote (e.g. HomeNAS, MediaServer) [Default: MyNAS]"
+if ($remoteName -eq "") { $remoteName = "MyNAS" }
 $skipConfig = $false
 
 Write-Host "`n--- CONFIGURATION MANAGER ---" -ForegroundColor Cyan
@@ -75,10 +76,9 @@ if ($existingRemotes -match "$remoteName`:") {
 }
 
 # 3. Network Details
-$localIP  = Read-Host "Enter Local Unraid IP [Default: 192.168.1.x]"
-if ($localIP -eq "") { $localIP = "192.168.1.x" }
-$remoteIP = Read-Host "Enter Tailscale IP [Default: 100.x.x.x]"
-if ($remoteIP -eq "") { $remoteIP = "100.x.x.x" }
+$localIP  = Read-Host "Enter Local IP address (e.g. 192.168.1.100)"
+if ($localIP -eq "") { Write-Host "Local IP is required." -ForegroundColor Red; exit }
+$remoteIP = Read-Host "Enter Tailscale IP address (e.g. 100.x.x.x) — leave blank to skip"
 $port     = Read-Host "Enter Port [Default: 80]"
 if ($port -eq "") { $port = "80" }
 $inputD   = Read-Host "Enter Drive Letter (A-Z) [Default: Z]"
