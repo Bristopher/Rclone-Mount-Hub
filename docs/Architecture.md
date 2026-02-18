@@ -1,6 +1,6 @@
 # Rclone Mount Hub — Architecture & Design
 
-> A polished Windows 11 desktop app for managing rclone mounts — Tauri 2 + React 19 + Rust.
+> A Windows 11 desktop app for managing rclone mounts — Tauri 2 + Rust + React 19.
 
 ---
 
@@ -55,38 +55,38 @@ The app wraps all of this in a polished GUI — no terminal, no scripts, just cl
 ## 3. Tech Stack
 
 ### Desktop Shell
-| Technology | Purpose |
-|------------|---------|
-| **Tauri 2** | Desktop shell. Rust backend, WebView2 frontend. ~5 MB binary |
-| **Rust** | Backend: spawns rclone, network detection, config, tray, system integration |
-| **Velopack** | Installer + in-app auto-update framework |
+| Technology   | Purpose                                                                     |
+| ------------ | --------------------------------------------------------------------------- |
+| **Tauri 2**  | Desktop shell. Rust backend, WebView2 frontend. ~5 MB binary                |
+| **Rust**     | Backend: spawns rclone, network detection, config, tray, system integration |
+| **Velopack** | Installer + in-app auto-update framework                                    |
 
 ### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| **React** | 19 | UI framework |
-| **TypeScript** | 5 | Type safety |
-| **Vite** | 7 | Build tooling with HMR (dev server: `localhost:1820`) |
-| **Tailwind CSS** | v4 | Utility-first styling, custom dark theme tokens (no config file — v4 CSS-native) |
-| **Zustand** | 5 | Client state (connections, settings, mount status, logs) |
-| **Radix UI** | 2 | Accessible headless component primitives |
-| **Framer Motion** | 12 | Page transitions, mount animations |
-| **dnd-kit** | — | Drag-and-drop reordering of connections |
-| **class-variance-authority + clsx** | — | Component variant system |
-| **Phosphor Icons** | — | Icon library |
-| **sonner** | — | Toast notifications |
+| Technology                          | Version | Purpose                                                                          |
+| ----------------------------------- | ------- | -------------------------------------------------------------------------------- |
+| **React**                           | 19      | UI framework                                                                     |
+| **TypeScript**                      | 5       | Type safety                                                                      |
+| **Vite**                            | 7       | Build tooling with HMR (dev server: `localhost:1820`)                            |
+| **Tailwind CSS**                    | v4      | Utility-first styling, custom dark theme tokens (no config file — v4 CSS-native) |
+| **Zustand**                         | 5       | Client state (connections, settings, mount status, logs)                         |
+| **Radix UI**                        | 2       | Accessible headless component primitives                                         |
+| **Framer Motion**                   | 12      | Page transitions, mount animations                                               |
+| **dnd-kit**                         | —       | Drag-and-drop reordering of connections                                          |
+| **class-variance-authority + clsx** | —       | Component variant system                                                         |
+| **Phosphor Icons**                  | —       | Icon library                                                                     |
+| **sonner**                          | —       | Toast notifications                                                              |
 
 > **Note:** `react-hook-form` and `zod` are installed but not used — forms use plain React `useState`.
 
 ### Tauri Plugins
-| Plugin | Purpose |
-|--------|---------|
-| `tauri-plugin-shell` | Spawn rclone, PowerShell, taskkill |
-| `tauri-plugin-store` | Persist connection configs and settings as JSON |
-| `tauri-plugin-autostart` | Windows startup registration |
-| `tauri-plugin-notification` | OS-native toast notifications (uses AUMID) |
-| `tauri-plugin-dialog` | File/folder picker dialogs |
-| `tauri-plugin-mcp-bridge` | **Dev only** — MCP bridge for Tauri devtools |
+| Plugin                      | Purpose                                         |
+| --------------------------- | ----------------------------------------------- |
+| `tauri-plugin-shell`        | Spawn rclone, PowerShell, taskkill              |
+| `tauri-plugin-store`        | Persist connection configs and settings as JSON |
+| `tauri-plugin-autostart`    | Windows startup registration                    |
+| `tauri-plugin-notification` | OS-native toast notifications (uses AUMID)      |
+| `tauri-plugin-dialog`       | File/folder picker dialogs                      |
+| `tauri-plugin-mcp-bridge`   | **Dev only** — MCP bridge for Tauri devtools    |
 
 ---
 
@@ -204,14 +204,14 @@ interface MountStatus {
 ### Speed Profiles
 Pre-configured rclone flag sets, selectable per connection.
 
-| | Max Speed | Balanced | Low Resource |
-|---|---|---|---|
-| **VFS Cache** | 50 GB | 10 GB | 2 GB |
-| **Buffer** | 512 MB | 256 MB | 64 MB |
-| **Read-Ahead** | 512 MB | 128 MB | 32 MB |
-| **Transfers** | 16 | 8 | 4 |
-| **Streams** | 16 | 8 | 4 |
-| **Best For** | 10Gbps LAN / Fiber | Daily use | Battery / slow WiFi |
+|                | Max Speed          | Balanced  | Low Resource        |
+| -------------- | ------------------ | --------- | ------------------- |
+| **VFS Cache**  | 50 GB              | 10 GB     | 2 GB                |
+| **Buffer**     | 512 MB             | 256 MB    | 64 MB               |
+| **Read-Ahead** | 512 MB             | 128 MB    | 32 MB               |
+| **Transfers**  | 16                 | 8         | 4                   |
+| **Streams**    | 16                 | 8         | 4                   |
+| **Best For**   | 10Gbps LAN / Fiber | Daily use | Battery / slow WiFi |
 
 All profiles include: `--vfs-cache-mode full`, `--ignore-checksum`, `--no-modtime`, `--network-mode=false`.
 
@@ -256,25 +256,25 @@ Velopack intercepts `--velopack-*` CLI args during install/update/uninstall even
 
 ### Command Module: `commands/rclone.rs` — 17 commands
 
-| Command | Description |
-|---------|-------------|
-| `check_rclone_installed` | Check `rclone` in PATH |
-| `check_winfsp_installed` | Check Windows registry for WinFsp |
-| `list_remotes` | `rclone listremotes` |
-| `list_rclone_remotes` | Detailed remote list with type info |
-| `get_rclone_config_dump` | Full `rclone config dump` output |
-| `create_remote` | `rclone config create` (password auto-obscured) |
-| `delete_remote` | `rclone config delete` |
-| `get_available_drives` | Unused drive letters D–Z |
-| `mount_drive` | Spawn `rclone mount` as child process, return PID |
-| `unmount_drive` | Kill rclone process by PID |
-| `get_mount_status` | Check if a drive letter is currently mounted |
-| `get_all_mount_statuses` | Batch status check for all connections |
-| `list_external_rclone_mounts` | Find rclone mounts not managed by this app |
-| `unmount_external_mount` | Kill an unmanaged rclone process |
-| `set_rclone_config_path` | Override default config file path |
-| `get_rclone_config_path` | Get current config path |
-| `get_default_rclone_config_path` | Get default `%APPDATA%\rclone\rclone.conf` |
+| Command                          | Description                                       |
+| -------------------------------- | ------------------------------------------------- |
+| `check_rclone_installed`         | Check `rclone` in PATH                            |
+| `check_winfsp_installed`         | Check Windows registry for WinFsp                 |
+| `list_remotes`                   | `rclone listremotes`                              |
+| `list_rclone_remotes`            | Detailed remote list with type info               |
+| `get_rclone_config_dump`         | Full `rclone config dump` output                  |
+| `create_remote`                  | `rclone config create` (password auto-obscured)   |
+| `delete_remote`                  | `rclone config delete`                            |
+| `get_available_drives`           | Unused drive letters D–Z                          |
+| `mount_drive`                    | Spawn `rclone mount` as child process, return PID |
+| `unmount_drive`                  | Kill rclone process by PID                        |
+| `get_mount_status`               | Check if a drive letter is currently mounted      |
+| `get_all_mount_statuses`         | Batch status check for all connections            |
+| `list_external_rclone_mounts`    | Find rclone mounts not managed by this app        |
+| `unmount_external_mount`         | Kill an unmanaged rclone process                  |
+| `set_rclone_config_path`         | Override default config file path                 |
+| `get_rclone_config_path`         | Get current config path                           |
+| `get_default_rclone_config_path` | Get default `%APPDATA%\rclone\rclone.conf`        |
 
 **Mount command constructed by Rust:**
 ```
@@ -294,55 +294,55 @@ rclone mount {remote}: {letter}: \
 
 ### Command Module: `commands/network.rs` — 3 commands
 
-| Command | Description |
-|---------|-------------|
-| `ping_host` | TCP connect test (port 80/443) |
-| `ping_port` | TCP connect test on specific port |
+| Command               | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `ping_host`           | TCP connect test (port 80/443)                           |
+| `ping_port`           | TCP connect test on specific port                        |
 | `detect_network_mode` | Returns `"local"` or `"tailscale"` based on reachability |
 
 ### Command Module: `commands/system.rs` — 13+ commands
 
-| Command | Description |
-|---------|-------------|
-| `install_rclone` | Install via Scoop package manager |
-| `uninstall_rclone` | Remove via Scoop |
-| `install_winfsp` | Download + launch WinFsp installer from GitHub releases |
-| `uninstall_winfsp` | Remove WinFsp |
-| `download_and_launch_winfsp_installer` | Fetch + run the WinFsp `.msi` |
-| `get_driver_versions` | Returns `{ rclone, winfsp }` version strings |
-| `check_driver_updates` | Check if newer versions are available |
-| `enable_autostart` | Register app in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
-| `disable_autostart` | Remove autostart registry entry |
-| `is_autostart_enabled` | Check current autostart status |
-| `add_to_start_menu` | Register AUMID so Windows notifications show app name |
-| `refresh_path` | Reload PATH env vars from registry after install |
-| `open_rclone_web_ui` | Launch `rclone rcd --rc-web-gui` |
-| `get_app_version` | Returns `CARGO_PKG_VERSION` |
-| `check_app_update` | Check Velopack update feed for new version |
-| `apply_app_update` | Download + apply Velopack update, restart app |
+| Command                                | Description                                                          |
+| -------------------------------------- | -------------------------------------------------------------------- |
+| `install_rclone`                       | Install via Scoop package manager                                    |
+| `uninstall_rclone`                     | Remove via Scoop                                                     |
+| `install_winfsp`                       | Download + launch WinFsp installer from GitHub releases              |
+| `uninstall_winfsp`                     | Remove WinFsp                                                        |
+| `download_and_launch_winfsp_installer` | Fetch + run the WinFsp `.msi`                                        |
+| `get_driver_versions`                  | Returns `{ rclone, winfsp }` version strings                         |
+| `check_driver_updates`                 | Check if newer versions are available                                |
+| `enable_autostart`                     | Register app in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` |
+| `disable_autostart`                    | Remove autostart registry entry                                      |
+| `is_autostart_enabled`                 | Check current autostart status                                       |
+| `add_to_start_menu`                    | Register AUMID so Windows notifications show app name                |
+| `refresh_path`                         | Reload PATH env vars from registry after install                     |
+| `open_rclone_web_ui`                   | Launch `rclone rcd --rc-web-gui`                                     |
+| `get_app_version`                      | Returns `CARGO_PKG_VERSION`                                          |
+| `check_app_update`                     | Check Velopack update feed for new version                           |
+| `apply_app_update`                     | Download + apply Velopack update, restart app                        |
 
 **Velopack update feed URL** is a constant in `system.rs`:
 ```rust
-const UPDATE_FEED_URL: &str = "https://github.com/OWNER/REPO/releases/latest/download";
+const UPDATE_FEED_URL: &str = "https://github.com/Bristopher/Rclone-Mount-Hub/releases/latest/download";
 ```
 Update this before the first public release.
 
 ### Command Module: `commands/speedtest.rs` — 3 commands
 
-| Command | Description |
-|---------|-------------|
-| `run_speed_test` | Write/read test file on mounted drive, returns upload + download MB/s, latency, bottleneck |
-| `analyze_network_path` | Detect LAN vs Tailscale (100.x range), returns hop info |
-| `test_local_disk_speed` | Benchmark local disk I/O, returns MB/s |
+| Command                 | Description                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------------------ |
+| `run_speed_test`        | Write/read test file on mounted drive, returns upload + download MB/s, latency, bottleneck |
+| `analyze_network_path`  | Detect LAN vs Tailscale (100.x range), returns hop info                                    |
+| `test_local_disk_speed` | Benchmark local disk I/O, returns MB/s                                                     |
 
 ### Command Module: `commands/window.rs` — 4 commands
 
-| Command | Description |
-|---------|-------------|
-| `show_window` | Un-hide and focus the main window |
-| `hide_window` | Hide to tray |
-| `update_tray_menu` | Rebuild tray menu with current mount list |
-| `send_notification` | Show Windows toast with correct app name |
+| Command             | Description                               |
+| ------------------- | ----------------------------------------- |
+| `show_window`       | Un-hide and focus the main window         |
+| `hide_window`       | Hide to tray                              |
+| `update_tray_menu`  | Rebuild tray menu with current mount list |
+| `send_notification` | Show Windows toast with correct app name  |
 
 ### System Tray (`lib.rs`)
 
@@ -412,14 +412,14 @@ interface LogStore {
 
 Hash-based routing in `App.tsx` (no react-router — 6 pages don't warrant the dependency):
 
-| Route | Page | Description |
-|-------|------|-------------|
-| `/` | Dashboard | All connection cards with live mount status |
-| `/add` | AddConnection | New connection form (protocol picker, drive stepper) |
-| `/edit/:id` | EditConnection | Edit existing connection |
-| `/settings` | Settings | Preferences, driver management, updates |
-| `/speedtest` | SpeedTest | Speed test, network analysis, disk benchmark |
-| `/export` | Export | Config export/import (credentials excluded) |
+| Route        | Page           | Description                                          |
+| ------------ | -------------- | ---------------------------------------------------- |
+| `/`          | Dashboard      | All connection cards with live mount status          |
+| `/add`       | AddConnection  | New connection form (protocol picker, drive stepper) |
+| `/edit/:id`  | EditConnection | Edit existing connection                             |
+| `/settings`  | Settings       | Preferences, driver management, updates              |
+| `/speedtest` | SpeedTest      | Speed test, network analysis, disk benchmark         |
+| `/export`    | Export         | Config export/import (credentials excluded)          |
 
 ### Tauri Bridge (`lib/tauri.ts`)
 
