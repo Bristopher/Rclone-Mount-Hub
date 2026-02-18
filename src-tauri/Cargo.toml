@@ -1,6 +1,6 @@
 [package]
 name = "rclone-mount-hub"
-version = "0.1.0"
+version = "0.1.1"
 description = "Beautiful desktop app for managing rclone mounts to Unraid servers"
 authors = ["Chris"]
 edition = "2021"
