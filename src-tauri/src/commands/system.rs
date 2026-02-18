@@ -67,18 +67,21 @@ async fn ensure_scoop_installed(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[command]
-pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn enable_autostart(_app: tauri::AppHandle, minimized: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
 
-        // Get the current exe path
         let exe_path = std::env::current_exe()
             .map_err(|e| format!("Failed to get exe path: {}", e))?;
-
         let exe_path_str = exe_path.to_string_lossy();
 
-        // Create registry entry for autostart
+        let value = if minimized {
+            format!("\"{}\" --minimized", exe_path_str)
+        } else {
+            format!("\"{}\"", exe_path_str)
+        };
+
         let output = Command::new("reg")
             .args([
                 "add",
@@ -88,7 +91,7 @@ pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
                 "/t",
                 "REG_SZ",
                 "/d",
-                &format!("\"{}\" --minimized", exe_path_str),
+                &value,
                 "/f",
             ])
             .output()
@@ -113,7 +116,7 @@ pub async fn disable_autostart(_app: tauri::AppHandle) -> Result<(), String> {
     {
         use std::process::Command;
 
-        let output = Command::new("reg")
+        let _output = Command::new("reg")
             .args([
                 "delete",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -370,13 +373,8 @@ pub async fn get_driver_versions(app: tauri::AppHandle) -> Result<DriverVersions
                 if output.status.success() {
                     // WinFsp is installed, try to get install dir for version
                     let stdout = String::from_utf8_lossy(&output.stdout);
-                    let install_dir = stdout
-                        .lines()
-                        .find(|line| line.contains("InstallDir"))
-                        .and_then(|line| line.split("REG_SZ").nth(1))
-                        .map(|s| s.trim());
-
                     // Just report as "ready" since version extraction is complex
+                    let _ = stdout; // suppress unused warning
                     (true, Some("ready".to_string()))
                 } else {
                     (false, None)
@@ -490,65 +488,3 @@ pub async fn check_driver_updates(app: tauri::AppHandle) -> Result<String, Strin
     }
 }
 
-// Helper function to check WinFsp via scoop
-#[cfg(target_os = "windows")]
-fn check_winfsp_via_scoop() -> (bool, Option<String>) {
-    use std::process::Command;
-
-    // Check if scoop has winfsp-np installed
-    let scoop_check = Command::new("powershell")
-        .args(["-Command", "scoop list winfsp-np"])
-        .output();
-
-    if let Ok(output) = scoop_check {
-        if output.status.success() {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-
-            // Parse scoop output - skip header lines
-            // Format is typically:
-            // Installed apps:
-            //   winfsp-np 2.0.23123 [main]
-            // OR
-            // Name      Version   Source
-            // ----      -------   ------
-            // winfsp-np 2.0       main
-
-            for line in stdout.lines() {
-                let trimmed = line.trim();
-
-                // Skip header lines and separator lines
-                if trimmed.starts_with("Installed apps")
-                    || trimmed.starts_with("Name")
-                    || trimmed.starts_with("----")
-                    || trimmed.is_empty() {
-                    continue;
-                }
-
-                // Check if this line actually has the package (not in a header)
-                if trimmed.starts_with("winfsp-np") {
-                    let parts: Vec<&str> = trimmed.split_whitespace().collect();
-                    // Format: winfsp-np VERSION [BUCKET]
-                    if parts.len() >= 2 {
-                        let version = parts[1].to_string();
-                        return (true, Some(version));
-                    }
-                    return (true, Some("installed".to_string()));
-                }
-            }
-        }
-    }
-
-    (false, None)
-}
-
-// Helper function to format WinFsp hex version to readable format
-fn format_winfsp_version(hex_str: &str) -> String {
-    if let Ok(num) = u32::from_str_radix(hex_str, 16) {
-        let major = (num >> 16) & 0xFF;
-        let minor = (num >> 8) & 0xFF;
-        let patch = num & 0xFF;
-        format!("v{}.{}.{}", major, minor, patch)
-    } else {
-        hex_str.to_string()
-    }
-}

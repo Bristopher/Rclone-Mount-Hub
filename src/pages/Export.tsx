@@ -11,11 +11,12 @@ import {
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { useConnectionStore } from "../lib/store";
+import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
 import type { Connection } from "../lib/types";
 
 export function Export() {
-  const { connections, add, setAll } = useConnectionStore();
+  const { connections, setAll } = useConnectionStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importError, setImportError] = useState<string>("");
 

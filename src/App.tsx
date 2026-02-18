@@ -7,7 +7,6 @@ import { EditConnection } from "./pages/EditConnection";
 import { Settings } from "./pages/Settings";
 import { Export } from "./pages/Export";
 import { SpeedTest } from "./pages/SpeedTest";
-import { LogPanel } from "./components/LogPanel";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, useConnectionStore } from "./lib/store";
@@ -30,6 +29,11 @@ function App() {
       setCurrentPage(page);
     }
   };
+
+  // Sync rclone config path to Rust on startup (so all commands use the right file)
+  useEffect(() => {
+    invoke("set_rclone_config_path", { path: settings.rclone_config_path }).catch(console.error);
+  }, [settings.rclone_config_path]);
 
   // Handle close to tray
   useEffect(() => {

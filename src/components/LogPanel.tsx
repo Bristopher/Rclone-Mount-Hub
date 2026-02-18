@@ -1,17 +1,14 @@
 import { useEffect, useRef } from "react";
 import {
   Terminal,
-  X,
   Trash,
   CaretDown,
-  CaretUp,
   CheckCircle,
   Warning,
   XCircle,
   Info,
 } from "phosphor-react";
 import { Button } from "./ui/Button";
-import { Badge } from "./ui/Badge";
 import { useLogStore } from "../lib/logStore";
 import type { LogEntry, LogCategory } from "../lib/logStore";
 

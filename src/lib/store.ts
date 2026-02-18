@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   default_speed_profile: "balanced",
   default_network_mode: "auto",
   show_notifications: true,
+  rclone_config_path: "",
 };
 
 // Settings Store
