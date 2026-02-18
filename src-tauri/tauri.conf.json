@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "rclone-mount-hub-temp",
+  "productName": "Rclone Mount Hub",
   "version": "0.1.0",
-  "identifier": "com.cbuzi.rclone-mount-hub-temp",
+  "identifier": "com.cbuzi.rclone-mount-hub",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1820",
@@ -33,6 +33,14 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "languages": ["English"],
+        "installMode": "currentUser",
+        "startMenuFolder": "Rclone Mount Hub"
+      }
+    }
   }
 }

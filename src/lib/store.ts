@@ -18,7 +18,7 @@ export const useMountSummaryStore = create<MountSummaryStore>()((set) => ({
 // Default settings matching AppSettings type
 const DEFAULT_SETTINGS: AppSettings = {
   start_with_windows: false,
-  start_minimized: false,
+  start_minimized: true,
   close_to_tray: true,
   theme: "dark",
   default_speed_profile: "balanced",
