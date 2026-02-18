@@ -384,6 +384,31 @@ Write-Output "OK: $LnkPath"
 }
 
 #[command]
+pub async fn remove_from_start_menu() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let start_menu_dir = std::env::var("APPDATA")
+            .map_err(|e| format!("Failed to get APPDATA: {}", e))?;
+        let lnk_path = format!(
+            "{}\\Microsoft\\Windows\\Start Menu\\Programs\\Rclone Mount Hub.lnk",
+            start_menu_dir
+        );
+
+        if std::path::Path::new(&lnk_path).exists() {
+            std::fs::remove_file(&lnk_path)
+                .map_err(|e| format!("Failed to remove shortcut: {}", e))?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Start Menu is Windows-only.".to_string())
+    }
+}
+
+#[command]
 pub async fn open_rclone_web_ui(app: tauri::AppHandle) -> Result<(), String> {
     // Spawn rclone rcd --rc-web-gui in a new terminal window
     #[cfg(target_os = "windows")]

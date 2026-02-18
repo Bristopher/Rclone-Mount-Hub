@@ -55,6 +55,7 @@ pub fn run() {
             commands::disable_autostart,
             commands::is_autostart_enabled,
             commands::add_to_start_menu,
+            commands::remove_from_start_menu,
             commands::refresh_path,
             commands::open_rclone_web_ui,
             // Speed test commands

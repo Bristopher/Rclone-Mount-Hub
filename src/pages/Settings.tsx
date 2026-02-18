@@ -110,6 +110,15 @@ export function Settings() {
     }
   };
 
+  const handleRemoveFromStartMenu = async () => {
+    try {
+      await invoke("remove_from_start_menu");
+      toast.success("Removed from Start Menu");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove from Start Menu");
+    }
+  };
+
   const loadDriverVersions = async () => {
     setDriversLoading(true);
     try {
@@ -356,15 +365,26 @@ export function Settings() {
                     notifications show "Rclone Mount Hub" instead of "Windows PowerShell"
                   </div>
                 </div>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleAddToStartMenu}
-                  className="gap-1.5 shrink-0 ml-4"
-                >
-                  <AppWindow size={14} weight="bold" />
-                  Add to Start Menu
-                </Button>
+                <div className="flex gap-2 shrink-0 ml-4">
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleAddToStartMenu}
+                    className="gap-1.5"
+                  >
+                    <AppWindow size={14} weight="bold" />
+                    Add to Start Menu
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleRemoveFromStartMenu}
+                    className="gap-1.5"
+                  >
+                    <Trash size={14} weight="bold" />
+                    Remove
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>
