@@ -376,7 +376,7 @@ export function Settings() {
                     Add to Start Menu
                   </Button>
                   <Button
-                    variant="destructive"
+                    variant="danger"
                     size="sm"
                     onClick={handleRemoveFromStartMenu}
                     className="gap-1.5"
