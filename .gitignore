@@ -212,4 +212,7 @@ src-tauri/bin/
 
 *.claude*
 .vscode/commands/
-*.myArchive*
+
+# Personal archive / local history — never commit these
+.myArchive/
+.history/
