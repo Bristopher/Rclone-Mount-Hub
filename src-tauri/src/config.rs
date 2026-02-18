@@ -64,7 +64,7 @@ impl SpeedProfile {
                 transfers: 16,
                 multi_thread_streams: 16,
                 ignore_checksum: true,
-                no_modtime: true,
+                no_modtime: false,
                 network_mode: false,
             },
             SpeedProfile::Balanced => SpeedProfileConfig {
@@ -75,7 +75,7 @@ impl SpeedProfile {
                 transfers: 8,
                 multi_thread_streams: 8,
                 ignore_checksum: true,
-                no_modtime: true,
+                no_modtime: false,
                 network_mode: false,
             },
             SpeedProfile::Low => SpeedProfileConfig {
@@ -86,7 +86,7 @@ impl SpeedProfile {
                 transfers: 4,
                 multi_thread_streams: 4,
                 ignore_checksum: true,
-                no_modtime: true,
+                no_modtime: false,
                 network_mode: false,
             },
         }
