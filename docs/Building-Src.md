@@ -54,21 +54,24 @@ vpk --version
 
 ### Build + package workflow
 
-**Step 1 — Compile the app** (skip the Tauri bundler, just get the exe):
+**Step 1 — Compile the app** (must use the Tauri CLI so it embeds the frontend):
 
 ```bash
-cd src-tauri && cargo build --release
+pnpm tauri build --bundles nsis
 ```
+
+> **Important:** Do NOT use `cargo build --release` directly — Tauri won't embed the frontend and the installed app will show a "localhost refused to connect" error.
 
 The compiled exe lands at:
 ```
 src-tauri/target/release/rclone-mount-hub.exe
 ```
+(The NSIS installer in `bundle/nsis/` is a side-effect you can ignore.)
 
 **Step 2 — Package with Velopack:**
 
 ```bash
-vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
+vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "src-tauri/target/release" --mainExe "rclone-mount-hub.exe"
 ```
 
 > On Windows use `^` instead of `\` for line continuation, or put it all on one line.
@@ -84,8 +87,8 @@ src-tauri\Releases
 
 
 **Safe to Rename:**
-*   ✅ `com.cbuzi.rclone-mount-hub-win-Setup.exe` -> `RcloneMountHub-Setup.exe`
-*   ✅ `com.cbuzi.rclone-mount-hub-win-Portable.zip` -> `RcloneMountHub-Portable.zip`
+*   ✅ `com.cbuzi.rclone-mount-hub-win-Setup.exe` -> `Rclone Mount Hub-Setup_v0.1.1.exe`
+*   ✅ `com.cbuzi.rclone-mount-hub-win-Portable.zip` -> `Rclone Mount Hub-Portable_v0.1.1.zip`
 
 **DO NOT Rename (Updates will break):**
 *   ❌ `com.cbuzi...-full.nupkg`
@@ -108,8 +111,8 @@ Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub
 
 2. Build + package:
    ```bash
-   cd src-tauri && cargo build --release
-   vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "target/release" --mainExe "rclone-mount-hub.exe"
+   pnpm tauri build --bundles nsis
+   vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "src-tauri/target/release" --mainExe "rclone-mount-hub.exe"
    ```
 
 3. Create a GitHub Release tagged `vx.y.z` and upload all files from `releases/`
