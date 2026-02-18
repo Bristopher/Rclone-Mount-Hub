@@ -112,6 +112,7 @@ pub enum MountState {
     Error,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub start_with_windows: bool,

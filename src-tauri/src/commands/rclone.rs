@@ -4,6 +4,7 @@ use tauri::command;
 use tauri_plugin_shell::ShellExt;
 use std::sync::Mutex;
 use std::collections::HashMap;
+use std::process::Command;
 use crate::config::{Connection, MountStatus, MountState, NetworkMode};
 use serde_json;
 
@@ -52,9 +53,9 @@ pub async fn get_default_rclone_config_path() -> String {
 
 #[derive(Debug, Clone)]
 struct MountInfo {
-    connection_id: String,
+    _connection_id: String,
     pid: u32,
-    drive_letter: String,
+    _drive_letter: String,
     active_mode: String,
     active_url: String,
 }
@@ -101,7 +102,7 @@ pub async fn check_winfsp_installed() -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let output = Command::new("reg")
+        let output = crate::util::cmd("reg")
             .args([
                 "query",
                 "HKLM\\SOFTWARE\\WOW6432Node\\WinFsp",
@@ -209,7 +210,7 @@ pub async fn get_available_drives() -> Result<Vec<String>, String> {
         use std::process::Command;
 
         // Get list of used drives
-        let output = Command::new("wmic")
+        let output = crate::util::cmd("wmic")
             .args(["logicaldisk", "get", "name"])
             .output()
             .map_err(|e| e.to_string())?;
@@ -349,9 +350,9 @@ pub async fn mount_drive(
 
     // Store mount info
     insert_mount(connection.id.clone(), MountInfo {
-        connection_id: connection.id.clone(),
+        _connection_id: connection.id.clone(),
         pid,
-        drive_letter: connection.drive_letter.clone(),
+        _drive_letter: connection.drive_letter.clone(),
         active_mode: active_mode.clone(),
         active_url: url.clone(),
     });
@@ -377,7 +378,7 @@ pub async fn unmount_drive(connection_id: String) -> Result<(), String> {
         {
             use std::process::Command;
             // Kill the rclone process by PID
-            Command::new("taskkill")
+            crate::util::cmd("taskkill")
                 .args(["/F", "/PID", &pid.to_string()])
                 .output()
                 .map_err(|e| format!("Failed to kill process: {}", e))?;
@@ -470,7 +471,7 @@ pub async fn unmount_external_mount(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
-        let output = Command::new("taskkill")
+        let output = crate::util::cmd("taskkill")
             .args(["/F", "/PID", &pid.to_string()])
             .output()
             .map_err(|e| format!("Failed to kill process: {}", e))?;
@@ -501,8 +502,7 @@ pub async fn unmount_external_mount(pid: u32) -> Result<(), String> {
 fn is_process_alive(pid: u32) -> bool {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-        let output = Command::new("tasklist")
+        let output = crate::util::cmd("tasklist")
             .args(["/FI", &format!("PID eq {}", pid), "/NH"])
             .output();
 
@@ -610,8 +610,6 @@ pub async fn get_rclone_config_dump(app: tauri::AppHandle) -> Result<String, Str
 pub async fn list_external_rclone_mounts() -> Result<Vec<ExternalMount>, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
         // WMIC is deprecated/removed in Windows 11 - use PowerShell Get-CimInstance instead
         let ps_script = r#"
             $procs = Get-CimInstance Win32_Process -Filter "Name='rclone.exe'" |
@@ -619,7 +617,7 @@ pub async fn list_external_rclone_mounts() -> Result<Vec<ExternalMount>, String>
             $procs | ConvertTo-Json -Compress
         "#;
 
-        let output = Command::new("powershell")
+        let output = crate::util::cmd("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", ps_script])
             .output()
             .map_err(|e| format!("Failed to list processes: {}", e))?;

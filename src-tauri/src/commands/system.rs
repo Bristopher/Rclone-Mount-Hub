@@ -70,8 +70,6 @@ async fn ensure_scoop_installed(app: &tauri::AppHandle) -> Result<(), String> {
 pub async fn enable_autostart(_app: tauri::AppHandle, minimized: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
         let exe_path = std::env::current_exe()
             .map_err(|e| format!("Failed to get exe path: {}", e))?;
         let exe_path_str = exe_path.to_string_lossy();
@@ -82,7 +80,7 @@ pub async fn enable_autostart(_app: tauri::AppHandle, minimized: bool) -> Result
             format!("\"{}\"", exe_path_str)
         };
 
-        let output = Command::new("reg")
+        let output = crate::util::cmd("reg")
             .args([
                 "add",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -114,9 +112,7 @@ pub async fn enable_autostart(_app: tauri::AppHandle, minimized: bool) -> Result
 pub async fn disable_autostart(_app: tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
-        let _output = Command::new("reg")
+        let _output = crate::util::cmd("reg")
             .args([
                 "delete",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -141,9 +137,7 @@ pub async fn disable_autostart(_app: tauri::AppHandle) -> Result<(), String> {
 pub async fn is_autostart_enabled(_app: tauri::AppHandle) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
-        let output = Command::new("reg")
+        let output = crate::util::cmd("reg")
             .args([
                 "query",
                 "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
@@ -212,8 +206,6 @@ pub async fn install_winfsp(_app: tauri::AppHandle) -> Result<(), String> {
 pub async fn download_and_launch_winfsp_installer(app: tauri::AppHandle) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
         // Fetch latest release info from GitHub API
         let api_output = app
             .shell()
@@ -265,7 +257,7 @@ pub async fn download_and_launch_winfsp_installer(app: tauri::AppHandle) -> Resu
         }
 
         // Launch the installer (user goes through wizard)
-        Command::new("msiexec")
+        crate::util::cmd("msiexec")
             .args(["/i", &temp_path])
             .spawn()
             .map_err(|e| format!("Failed to launch installer: {}", e))?;
@@ -301,8 +293,6 @@ pub async fn refresh_path() -> Result<(), String> {
 pub async fn add_to_start_menu() -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        use std::process::Command;
-
         let exe_path = std::env::current_exe()
             .map_err(|e| format!("Failed to get exe path: {}", e))?;
         let exe_str = exe_path.to_string_lossy().replace('\'', "''");
@@ -374,7 +364,7 @@ Add-Type -TypeDefinition $sig -Language CSharp
 Write-Output "OK: $LnkPath"
 "#, exe = exe_str);
 
-        let output = Command::new("powershell")
+        let output = crate::util::cmd("powershell")
             .args(["-NoProfile", "-NonInteractive", "-Command", &script])
             .output()
             .map_err(|e| format!("Failed to run PowerShell: {}", e))?;
@@ -457,10 +447,8 @@ pub async fn get_driver_versions(app: tauri::AppHandle) -> Result<DriverVersions
     let (winfsp_installed, winfsp_version) = {
         #[cfg(target_os = "windows")]
         {
-            use std::process::Command;
-
             // Check if WinFsp registry key exists (means it's installed)
-            let reg_check = Command::new("reg")
+            let reg_check = crate::util::cmd("reg")
                 .args([
                     "query",
                     "HKLM\\SOFTWARE\\WOW6432Node\\WinFsp",
