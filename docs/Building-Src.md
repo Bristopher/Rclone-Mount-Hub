@@ -57,8 +57,7 @@ vpk --version
 **Step 1 — Compile the app:**
 
 ```bash
-cd src-tauri
-pnpm tauri build
+cd src-tauri && pnpm tauri build
 ```
 
 > **Important:** Do NOT use `cargo build --release` directly — Tauri won't embed the frontend and the installed app will show a "localhost refused to connect" error.
@@ -73,8 +72,6 @@ src-tauri/target/release/Rclone Mount Hub.exe
 ```bash
 vpk pack --packId "Rclone Mount Hub" --packVersion 0.1.2 --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
 ```
-
-> On Windows use `^` instead of `\` for line continuation, or put it all on one line.
 
 **Step 3 — Output:**
 
@@ -111,8 +108,7 @@ Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub
 
 2. Build + package:
    ```bash
-   cd src-tauri
-   pnpm tauri build
+   cd src-tauri && pnpm tauri build
    vpk pack --packId "Rclone Mount Hub" --packVersion x.y.z --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
    ```
 
