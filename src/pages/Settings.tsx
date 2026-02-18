@@ -226,7 +226,7 @@ export function Settings() {
       }
     } catch (err) {
       const errorMsg = typeof err === "string" ? err : err instanceof Error ? err.message : "Failed to check for updates";
-      addLog("error", `✗ Update check failed: ${errorMsg}`, "updates");
+      addLog("error", `✗ Update check failed: ${errorMsg}`, "system");
       toast.error(errorMsg);
       setUpdateStatus("idle");
     }
