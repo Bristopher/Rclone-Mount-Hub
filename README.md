@@ -6,7 +6,7 @@
 [![Tauri](https://img.shields.io/badge/built%20with-Tauri%202-ffc131?logo=tauri&logoColor=white)](https://tauri.app)
 [![React](https://img.shields.io/badge/frontend-React%2019-61dafb?logo=react&logoColor=black)](https://react.dev)
 [![Rust](https://img.shields.io/badge/backend-Rust-ce422b?logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![Version](https://img.shields.io/badge/version-0.1.1-22c55e)](https://github.com/OWNER/REPO/releases)
+[![Version](https://img.shields.io/badge/version-0.1.1-22c55e)](https://github.com/Bristopher/Rclone-Mount-Hub/releases)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-a855f7)](LICENSE)
 
 ---
@@ -117,7 +117,7 @@ Three tuned rclone flag presets selectable per connection:
 
 ### Install
 
-Download the latest `Rclone Mount Hub_x.x.x_x64-setup.exe` from [Releases](https://github.com/OWNER/REPO/releases) and run it. No admin rights needed.
+Download the latest `Rclone Mount Hub_x.x.x_x64-setup.exe` from [Releases](https://github.com/Bristopher/Rclone-Mount-Hub/releases) and run it. No admin rights needed.
 
 On first launch the app checks for rclone and WinFsp and offers to install them for you.
 
@@ -163,7 +163,7 @@ Re-run the installer over your existing installation (updates in place), or use 
 
 ## Building from Source
 
-See **[docs/building.md](docs/building.md)** for the full guide.
+See **[docs/Building-Src.md](docs/Building-Src.md)** for the full guide.
 
 ```bash
 # Prerequisites: Rust (stable), Node.js 18+, pnpm
@@ -178,8 +178,8 @@ pnpm tauri build --bundles nsis   # production NSIS installer
 
 |                                              |                                               |
 | -------------------------------------------- | --------------------------------------------- |
-| [docs/building.md](docs/building.md)         | Build, bundle, distribute, version bumping    |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Full architecture, data models, design system |
+| [docs/Building-Src.md](docs/Building-Src.md)         | Build, bundle, distribute, version bumping    |
+| [docs/Architecture.md](docs/Architecture.md) | Full architecture, data models, design system |
 
 ---
 

@@ -116,10 +116,10 @@ Upload the entire `releases/` folder contents as assets on a new GitHub Release 
 The in-app updater points to a constant in `src-tauri/src/commands/system.rs`:
 
 ```rust
-const UPDATE_FEED_URL: &str = "https://github.com/OWNER/REPO/releases/latest/download";
+const UPDATE_FEED_URL: &str = "https://github.com/Bristopher/Rclone-Mount-Hub/releases/latest/download";
 ```
 
-Replace `OWNER/REPO` with your actual GitHub username and repository name before your first release.
+Replace `Bristopher/Rclone-Mount-Hub` with your actual GitHub username and repository name before your first release.
 
 ---
 
