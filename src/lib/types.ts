@@ -41,6 +41,8 @@ export interface AppSettings {
   default_speed_profile: SpeedProfile;
   default_network_mode: NetworkMode;
   show_notifications: boolean;
+  /** Empty string = use rclone's own default (~/.config/rclone/rclone.conf or %APPDATA%\rclone\rclone.conf) */
+  rclone_config_path: string;
 }
 
 export interface SpeedProfileInfo {

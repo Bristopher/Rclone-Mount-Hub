@@ -57,6 +57,10 @@ pub fn run() {
             commands::hide_window,
             commands::send_notification,
             commands::update_tray_menu,
+            // Rclone config path
+            commands::set_rclone_config_path,
+            commands::get_rclone_config_path,
+            commands::get_default_rclone_config_path,
         ])
         .setup(|app| {
             // Create system tray menu
@@ -112,6 +116,13 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Start hidden if launched with --minimized (autostart with "Start minimized" enabled)
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
 
             Ok(())
         });

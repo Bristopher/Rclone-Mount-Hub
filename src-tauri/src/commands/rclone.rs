@@ -10,6 +10,46 @@ use serde_json;
 // Global state to track active mounts
 static ACTIVE_MOUNTS: Mutex<Option<HashMap<String, MountInfo>>> = Mutex::new(None);
 
+// Custom rclone config path (None = use rclone's own default)
+static RCLONE_CONFIG_PATH: Mutex<Option<String>> = Mutex::new(None);
+
+/// Returns `["--config", "<path>"]` args to prepend when a custom path is set.
+fn config_args() -> Vec<String> {
+    let lock = RCLONE_CONFIG_PATH.lock().unwrap();
+    match lock.as_ref() {
+        Some(p) if !p.is_empty() => vec!["--config".to_string(), p.clone()],
+        _ => vec![],
+    }
+}
+
+#[command]
+pub async fn set_rclone_config_path(path: String) -> Result<(), String> {
+    let mut lock = RCLONE_CONFIG_PATH.lock().unwrap();
+    *lock = if path.is_empty() { None } else { Some(path) };
+    Ok(())
+}
+
+#[command]
+pub async fn get_rclone_config_path() -> String {
+    let lock = RCLONE_CONFIG_PATH.lock().unwrap();
+    lock.clone().unwrap_or_default()
+}
+
+#[command]
+pub async fn get_default_rclone_config_path() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            return format!("{}\\rclone\\rclone.conf", appdata);
+        }
+    }
+    // macOS / Linux fallback
+    if let Ok(home) = std::env::var("HOME") {
+        return format!("{}/.config/rclone/rclone.conf", home);
+    }
+    String::new()
+}
+
 #[derive(Debug, Clone)]
 struct MountInfo {
     connection_id: String,
@@ -83,10 +123,12 @@ pub async fn check_winfsp_installed() -> Result<bool, String> {
 
 #[command]
 pub async fn list_remotes(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let mut args = config_args();
+    args.push("listremotes".to_string());
     let output = app
         .shell()
         .command("rclone")
-        .args(["listremotes"])
+        .args(&args)
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -112,13 +154,9 @@ pub async fn create_remote(
     remote_type: String,
     params: std::collections::HashMap<String, String>,
 ) -> Result<(), String> {
-    // Build: rclone config create <name> <type> key1 val1 key2 val2 ...
-    let mut args = vec![
-        "config".to_string(),
-        "create".to_string(),
-        name,
-        remote_type,
-    ];
+    // Build: rclone [--config path] config create <name> <type> key1 val1 key2 val2 ...
+    let mut args = config_args();
+    args.extend(["config".to_string(), "create".to_string(), name, remote_type]);
 
     // Append each param as a key-value pair
     for (key, value) in &params {
@@ -146,10 +184,12 @@ pub async fn create_remote(
 
 #[command]
 pub async fn delete_remote(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    let mut args = config_args();
+    args.extend(["config".to_string(), "delete".to_string(), name.clone()]);
     let output = app
         .shell()
         .command("rclone")
-        .args(["config", "delete", &name])
+        .args(&args)
         .output()
         .await
         .map_err(|e| e.to_string())?;
@@ -244,7 +284,8 @@ pub async fn mount_drive(
     let drive = format!("{}:", connection.drive_letter);
     let remote = format!("{}:", connection.name);
 
-    let mut args = vec![
+    let mut args = config_args();
+    args.extend([
         "mount".to_string(),
         remote,
         drive.clone(),
@@ -263,7 +304,7 @@ pub async fn mount_drive(
         "--multi-thread-streams".to_string(),
         profile_config.multi_thread_streams.to_string(),
         format!("--volname={}", connection.name),
-    ];
+    ]);
 
     if profile_config.ignore_checksum {
         args.push("--ignore-checksum".to_string());
@@ -507,10 +548,12 @@ pub struct ExternalMount {
 #[command]
 pub async fn list_rclone_remotes(app: tauri::AppHandle) -> Result<Vec<RcloneRemote>, String> {
     // Get full config dump once (contains all remotes with their settings)
+    let mut args = config_args();
+    args.extend(["config".to_string(), "dump".to_string()]);
     let dump_output = app
         .shell()
         .command("rclone")
-        .args(["config", "dump"])
+        .args(&args)
         .output()
         .await
         .map_err(|e| format!("Failed to dump config: {}", e))?;
@@ -545,10 +588,12 @@ pub async fn list_rclone_remotes(app: tauri::AppHandle) -> Result<Vec<RcloneRemo
 
 #[command]
 pub async fn get_rclone_config_dump(app: tauri::AppHandle) -> Result<String, String> {
+    let mut args = config_args();
+    args.extend(["config".to_string(), "dump".to_string()]);
     let output = app
         .shell()
         .command("rclone")
-        .args(["config", "dump"])
+        .args(&args)
         .output()
         .await
         .map_err(|e| format!("Failed to dump config: {}", e))?;

@@ -10,6 +10,8 @@ import {
   Download,
   Trash,
   CloudArrowUp,
+  FolderOpen,
+  File,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -20,6 +22,7 @@ import { useLogStore } from "../lib/logStore";
 import { Check } from "phosphor-react";
 import type { SpeedProfile, NetworkMode } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
+import { open as openFilePicker } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 
 interface DriverVersions {
@@ -38,10 +41,12 @@ export function Settings() {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [winfspInstallerLaunched, setWinfspInstallerLaunched] = useState(false);
   const [verifyingWinfsp, setVerifyingWinfsp] = useState(false);
+  const [defaultConfigPath, setDefaultConfigPath] = useState("");
 
   useEffect(() => {
     loadDriverVersions();
     syncAutostart();
+    invoke<string>("get_default_rclone_config_path").then(setDefaultConfigPath).catch(() => {});
   }, []);
 
   const syncAutostart = async () => {
@@ -58,7 +63,7 @@ export function Settings() {
   const handleToggleAutostart = async (enabled: boolean) => {
     try {
       if (enabled) {
-        await invoke("enable_autostart");
+        await invoke("enable_autostart", { minimized: settings.start_minimized });
       } else {
         await invoke("disable_autostart");
       }
@@ -67,6 +72,24 @@ export function Settings() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to toggle autostart");
     }
+  };
+
+  const handleBrowseConfigPath = async () => {
+    const selected = await openFilePicker({
+      title: "Select Rclone Config File",
+      filters: [{ name: "Rclone Config", extensions: ["conf"] }],
+    });
+    if (selected && typeof selected === "string") {
+      update({ rclone_config_path: selected });
+      await invoke("set_rclone_config_path", { path: selected });
+      toast.success("Rclone config path updated");
+    }
+  };
+
+  const handleResetConfigPath = async () => {
+    update({ rclone_config_path: "" });
+    await invoke("set_rclone_config_path", { path: "" });
+    toast.success("Reset to rclone default config path");
   };
 
   const loadDriverVersions = async () => {
@@ -249,7 +272,13 @@ export function Settings() {
                 </div>
                 <Toggle
                   enabled={settings.start_minimized}
-                  onChange={(val) => update({ start_minimized: val })}
+                  onChange={async (val) => {
+                    update({ start_minimized: val });
+                    // Keep registry entry in sync if autostart is enabled
+                    if (settings.start_with_windows) {
+                      await invoke("enable_autostart", { minimized: val }).catch(() => {});
+                    }
+                  }}
                 />
               </div>
 
@@ -420,7 +449,45 @@ export function Settings() {
             </div>
           </Card>
 
-          {/* Section E - Driver Management */}
+          {/* Section E - Rclone Config Path */}
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+              <File size={18} weight="duotone" className="text-accent-purple" />
+              Rclone Config File
+            </h2>
+            <p className="text-[11px] text-text-tertiary mb-4">
+              By default rclone uses its own config file location. Set a custom path if you use a different config file.
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={settings.rclone_config_path}
+                  onChange={(e) => update({ rclone_config_path: e.target.value })}
+                  onBlur={() => invoke("set_rclone_config_path", { path: settings.rclone_config_path }).catch(() => {})}
+                  placeholder={defaultConfigPath || "%APPDATA%\\rclone\\rclone.conf"}
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-blue/50 font-mono"
+                />
+                <Button variant="ghost" size="sm" onClick={handleBrowseConfigPath} className="gap-1.5 shrink-0">
+                  <FolderOpen size={15} weight="bold" />
+                  Browse
+                </Button>
+              </div>
+              {settings.rclone_config_path && (
+                <Button variant="ghost" size="sm" onClick={handleResetConfigPath} className="gap-1.5 text-text-tertiary">
+                  <ArrowsClockwise size={13} weight="bold" />
+                  Reset to rclone default
+                </Button>
+              )}
+              {!settings.rclone_config_path && defaultConfigPath && (
+                <p className="text-[11px] text-text-tertiary">
+                  Using default: <span className="font-mono text-text-secondary">{defaultConfigPath}</span>
+                </p>
+              )}
+            </div>
+          </Card>
+
+          {/* Section F - Driver Management */}
           <Card className="p-6">
             <h2 className="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
               <HardDrives size={18} weight="duotone" className="text-accent-red" />
