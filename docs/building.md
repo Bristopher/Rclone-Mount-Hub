@@ -8,8 +8,7 @@
 | **Node.js** (v18+) | https://nodejs.org |
 | **pnpm** | `npm i -g pnpm` |
 | **WebView2 Runtime** | Pre-installed on Windows 10/11. If missing: https://developer.microsoft.com/en-us/microsoft-edge/webview2/ |
-
-> **NSIS installer** is built automatically. If you also want the MSI target you'll need the [WiX Toolset v3](https://wixtoolset.org/releases/) on your PATH — but NSIS is recommended for distribution so you can skip it.
+| **.NET 8 SDK** *(Velopack only)* | https://dotnet.microsoft.com/download — required to install the `vpk` CLI |
 
 ---
 
@@ -24,16 +23,121 @@ The app opens at `http://localhost:1820`. Rust changes rebuild automatically; fr
 
 ---
 
-## Production build
+## Distribution methods
+
+There are two ways to package Rclone Mount Hub for distribution:
+
+| Method | Installer look | Auto-update | Delta updates | Extra tooling |
+|--------|---------------|-------------|---------------|---------------|
+| **Velopack** *(recommended)* | Clean, fast, silent | Built-in | Yes | .NET 8 SDK + `vpk` CLI |
+| **NSIS** *(Tauri built-in)* | Classic wizard | Manual re-download | No | None |
+
+---
+
+## Recommended: Velopack
+
+Velopack replaces the NSIS installer with a much cleaner experience and adds proper in-app auto-update. This is the recommended way to distribute.
+
+### One-time setup
+
+Install the `vpk` CLI (requires .NET 8 SDK):
 
 ```bash
-pnpm tauri build
+dotnet tool install -g vpk
 ```
 
-This runs:
-1. `pnpm build` — Vite bundles the frontend into `dist/`
-2. `cargo build --release` — compiles the Rust backend
-3. Tauri bundles everything into installers
+Verify it works:
+
+```bash
+vpk --version
+```
+
+### Build + package workflow
+
+**Step 1 — Compile the app** (skip the Tauri bundler, just get the exe):
+
+```bash
+pnpm tauri build --bundles none
+```
+
+The compiled exe lands at:
+```
+src-tauri/target/release/Rclone Mount Hub.exe
+```
+
+**Step 2 — Package with Velopack:**
+
+```bash
+vpk pack \
+  --packId com.cbuzi.rclone-mount-hub \
+  --packVersion 0.1.1 \
+  --packDir "src-tauri/target/release" \
+  --mainExe "Rclone Mount Hub.exe"
+```
+
+> On Windows use `^` instead of `\` for line continuation, or put it all on one line.
+
+**Step 3 — Output:**
+
+```
+releases/
+├── RcloneMountHub-0.1.1-win-Setup.exe    ← distribute this
+├── RcloneMountHub-0.1.1-full.nupkg       ← full update package
+├── RcloneMountHub-0.1.0-delta.nupkg      ← delta (if prior version exists)
+└── RELEASES                               ← update feed index
+```
+
+**Step 4 — Publish to GitHub Releases:**
+
+Upload the entire `releases/` folder contents as assets on a new GitHub Release tagged `v0.1.1`. The in-app updater reads from this release automatically.
+
+### Releasing a new version
+
+1. Bump the version in **two** files:
+   ```
+   src-tauri/tauri.conf.json   →  "version": "x.y.z"
+   src-tauri/Cargo.toml        →  version = "x.y.z"
+   src-tauri/Cargo.lock        →  (auto-updated on next build)
+   ```
+
+2. Build + package:
+   ```bash
+   pnpm tauri build --bundles none
+   vpk pack --packId com.cbuzi.rclone-mount-hub --packVersion x.y.z \
+     --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
+   ```
+
+3. Create a GitHub Release tagged `vx.y.z` and upload all files from `releases/`
+
+4. Users already running the app will see "Update available" in **Settings → About & Updates** and can update in one click. Users on the old version installing fresh download the new `Setup.exe`.
+
+### Update feed URL
+
+The in-app updater points to a constant in `src-tauri/src/commands/system.rs`:
+
+```rust
+const UPDATE_FEED_URL: &str = "https://github.com/OWNER/REPO/releases/latest/download";
+```
+
+Replace `OWNER/REPO` with your actual GitHub username and repository name before your first release.
+
+---
+
+## Alternative: NSIS (Tauri built-in)
+
+No extra tooling required. Use this if you don't want to set up Velopack or don't need auto-update.
+
+### Build
+
+```bash
+# Full build (NSIS + MSI)
+pnpm tauri build
+
+# NSIS only (faster, skip MSI)
+pnpm tauri build --bundles nsis
+```
+
+First build takes several minutes while Rust compiles from scratch; subsequent builds are much faster.
 
 ### Output
 
@@ -46,50 +150,40 @@ src-tauri/target/release/bundle/
 └── Rclone Mount Hub.exe                         ← portable (no installer)
 ```
 
-### Build only the NSIS installer (faster, recommended)
+### What the NSIS installer does
 
-```bash
-pnpm tauri build --bundles nsis
-```
-
-Skips MSI generation. First build takes several minutes while Rust compiles from scratch; subsequent builds are much faster.
-
----
-
-## What the NSIS installer does
-
-- Installs to `%LocalAppData%\Rclone Mount Hub\` — **no admin rights required** (`installMode: currentUser`)
+- Installs to `%LocalAppData%\Rclone Mount Hub\` — **no admin rights required**
 - Creates a Start Menu shortcut under **Rclone Mount Hub/**
-- Registers the app with Windows so toast notifications show **"Rclone Mount Hub"** (not "Windows PowerShell")
+- Registers the app so toast notifications show **"Rclone Mount Hub"**
 - Creates an uninstaller entry in Add/Remove Programs
-- The app's autostart registry entry (`HKCU\...\Run`) points to the installed `.exe`, so **Start with Windows** works correctly after install
+- The app's autostart registry entry points to the installed `.exe`, so **Start with Windows** works correctly after install
+
+### Updating via NSIS
+
+Re-running the installer over an existing install updates in place — users don't need to uninstall first. There is no in-app auto-update; users must manually download and re-run the new installer.
 
 ---
 
-## Updating / distributing a new version
+## Portable / no-installer
 
-Re-running the NSIS installer over an existing install will **update in place** — it replaces the binaries and updates the Add/Remove Programs entry. Users do not need to uninstall first.
-
-Workflow:
-1. Bump the version in **two** files:
-   ```
-   src-tauri/tauri.conf.json   →  "version": "x.y.z"
-   src-tauri/Cargo.toml        →  version = "x.y.z"
-   ```
-2. Build: `pnpm tauri build --bundles nsis`
-3. Distribute the new `Rclone Mount Hub_x.y.z_x64-setup.exe`
-
----
-
-## Portable / zip distribution
-
-If you want a portable build with no installer, copy the standalone exe from:
+Copy the standalone exe directly:
 
 ```
 src-tauri/target/release/Rclone Mount Hub.exe
 ```
 
-> **Note:** With the portable exe, Windows won't know the app's identity, so toast notifications will show "Windows PowerShell". Users can fix this by going to **Settings → Startup → Add to Start Menu**, which registers the AUMID and creates a shortcut.
+> **Note:** With the portable exe, toast notifications will show "Windows PowerShell" since Windows doesn't know the app's identity. Users can fix this via **Settings → Startup → Add to Start Menu**.
+
+---
+
+## Bumping the version
+
+Always update **both** files — they must stay in sync:
+
+```
+src-tauri/tauri.conf.json   →  "version": "x.y.z"
+src-tauri/Cargo.toml        →  version = "x.y.z"
+```
 
 ---
 
@@ -101,4 +195,7 @@ src-tauri/target/release/Rclone Mount Hub.exe
 | `error: linker 'link.exe' not found` | Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload |
 | WebView2 missing at runtime | Install the [WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) — already present on Windows 10 (1803+) / 11 |
 | NSIS not found | Tauri bundles its own NSIS copy — if it fails, run `cargo install tauri-cli` to update the CLI |
+| `vpk: command not found` | Run `dotnet tool install -g vpk` and ensure `~/.dotnet/tools` is on your PATH |
+| `vpk pack` fails with missing exe | Make sure you ran `pnpm tauri build --bundles none` first so the exe exists |
 | Build succeeds but app crashes on start | Check `src-tauri/target/release/` for a `.log` file, or run the exe from a terminal to see stderr |
+| In-app updater finds no updates | Check that `UPDATE_FEED_URL` in `system.rs` matches your actual GitHub repo and that release assets were uploaded correctly |
