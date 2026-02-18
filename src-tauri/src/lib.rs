@@ -1,12 +1,20 @@
 mod commands;
 mod config;
+mod util;
 
 use tauri::Manager;
 use tauri::{menu::*, tray::*};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            // A second instance was launched — focus the existing window instead
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
@@ -86,7 +94,6 @@ pub fn run() {
                 .on_menu_event(move |app, event| {
                     let id = event.id.as_ref();
                     if id.starts_with("open-") {
-                        // "open-E" → open E:\ in Explorer
                         let letter = &id["open-".len()..];
                         let path = format!("{}:\\", letter);
                         let _ = std::process::Command::new("explorer")
@@ -111,18 +118,14 @@ pub fn run() {
                     if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
+                            let _ = window.show();
+                            let _ = window.set_focus();
                         }
                     }
                 })
                 .build(app)?;
 
-            // Start hidden if launched with --minimized (autostart with "Start minimized" enabled)
+            // Start hidden if launched with --minimized
             if std::env::args().any(|a| a == "--minimized") {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
@@ -133,9 +136,7 @@ pub fn run() {
         });
 
     #[cfg(debug_assertions)]
-    {
-        builder = builder.plugin(tauri_plugin_mcp_bridge::init());
-    }
+    let builder = builder.plugin(tauri_plugin_mcp_bridge::init());
 
     builder
         .run(tauri::generate_context!())

@@ -57,18 +57,18 @@ vpk --version
 **Step 1 — Compile the app** (skip the Tauri bundler, just get the exe):
 
 ```bash
-pnpm tauri build --bundles none
+cd src-tauri && cargo build --release
 ```
 
 The compiled exe lands at:
 ```
-src-tauri/target/release/Rclone Mount Hub.exe
+src-tauri/target/release/rclone-mount-hub.exe
 ```
 
 **Step 2 — Package with Velopack:**
 
 ```bash
-vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.1 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
+vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion 0.1.2 --packDir "target/release" --mainExe "rclone-mount-hub.exe"
 ```
 
 > On Windows use `^` instead of `\` for line continuation, or put it all on one line.
@@ -108,9 +108,8 @@ Upload the entire `src-tauri\Releases` folder contents as assets on a new GitHub
 
 2. Build + package:
    ```bash
-   pnpm tauri build --bundles none
-   vpk pack --packId ?Rclone Mount Hub" --packVersion x.y.z \
-     --packDir "src-tauri/target/release" --mainExe "Rclone Mount Hub.exe"
+   cd src-tauri && cargo build --release
+   vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion x.y.z --packDir "target/release" --mainExe "rclone-mount-hub.exe"
    ```
 
 3. Create a GitHub Release tagged `vx.y.z` and upload all files from `releases/`
