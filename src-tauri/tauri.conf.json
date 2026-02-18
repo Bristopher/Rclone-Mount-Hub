@@ -39,8 +39,7 @@
         "displayLanguageSelector": false,
         "languages": ["English"],
         "installMode": "currentUser",
-        "startMenuFolder": "Rclone Mount Hub",
-        "createDesktopShortcut": false
+        "startMenuFolder": "Rclone Mount Hub"
       }
     }
   }
