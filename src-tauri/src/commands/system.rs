@@ -295,6 +295,104 @@ pub async fn refresh_path() -> Result<(), String> {
     }
 }
 
+/// Creates a Start Menu shortcut and registers the AppUserModelID so Windows
+/// attributes toast notifications to "Rclone Mount Hub" instead of "Windows PowerShell".
+#[command]
+pub async fn add_to_start_menu() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+
+        let exe_path = std::env::current_exe()
+            .map_err(|e| format!("Failed to get exe path: {}", e))?;
+        let exe_str = exe_path.to_string_lossy().replace('\'', "''");
+
+        // PowerShell script:
+        // 1. Create the .lnk in %APPDATA%\Microsoft\Windows\Start Menu\Programs\
+        // 2. Set the AppUserModelID on the shortcut via IPropertyStore (Windows Shell COM)
+        //    This is what tells Windows which "app" is sending notifications.
+        let script = format!(r#"
+$ExePath = '{exe}'
+$AppName = 'Rclone Mount Hub'
+$Aumid   = 'com.cbuzi.rclone-mount-hub'
+$StartMenuDir = [Environment]::GetFolderPath('Programs')
+$LnkPath = Join-Path $StartMenuDir "$AppName.lnk"
+
+# Create the shortcut
+$WshShell = New-Object -ComObject WScript.Shell
+$sc = $WshShell.CreateShortcut($LnkPath)
+$sc.TargetPath      = $ExePath
+$sc.WorkingDirectory = Split-Path -Parent $ExePath
+$sc.IconLocation    = "$ExePath,0"
+$sc.Description     = 'Manage rclone drive mounts'
+$sc.Save()
+
+# Set AppUserModelID on the .lnk via IPropertyStore so Windows uses our
+# app name/icon for toast notifications instead of "Windows PowerShell"
+$sig = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+public static class Lnk {{
+    [DllImport("shell32.dll")] static extern int SHGetPropertyStoreFromParsingName(
+        [MarshalAs(UnmanagedType.LPWStr)] string path, IntPtr pbc,
+        int flags, ref Guid riid, out IPropertyStore ppv);
+    [ComImport][Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    public interface IPropertyStore {{
+        int GetCount(out uint c); int GetAt(uint i, out PROPERTYKEY k);
+        int GetValue(ref PROPERTYKEY k, out PROPVARIANT v);
+        int SetValue(ref PROPERTYKEY k, ref PROPVARIANT v);
+        int Commit();
+    }}
+    [StructLayout(LayoutKind.Sequential)] public struct PROPERTYKEY {{
+        public Guid fmtid; public uint pid;
+    }}
+    [StructLayout(LayoutKind.Explicit)] public struct PROPVARIANT {{
+        [FieldOffset(0)] public ushort vt;
+        [FieldOffset(8)] public IntPtr pwszVal;
+    }}
+    public static void SetAumid(string lnkPath, string aumid) {{
+        var riid = new Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99");
+        IPropertyStore ps;
+        SHGetPropertyStoreFromParsingName(lnkPath, IntPtr.Zero, 1, ref riid, out ps);
+        var key = new PROPERTYKEY {{
+            fmtid = new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), pid = 5
+        }};
+        var pv = new PROPVARIANT();
+        pv.vt = 31; // VT_LPWSTR
+        pv.pwszVal = Marshal.StringToCoTaskMemUni(aumid);
+        ps.SetValue(ref key, ref pv);
+        ps.Commit();
+        Marshal.ReleaseComObject(ps);
+        Marshal.FreeCoTaskMem(pv.pwszVal);
+    }}
+}}
+'@
+Add-Type -TypeDefinition $sig -Language CSharp
+[Lnk]::SetAumid($LnkPath, $Aumid)
+Write-Output "OK: $LnkPath"
+"#, exe = exe_str);
+
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .map_err(|e| format!("Failed to run PowerShell: {}", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("Failed to create Start Menu shortcut:\n{}", stderr.trim()));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Start Menu is Windows-only.".to_string())
+    }
+}
+
 #[command]
 pub async fn open_rclone_web_ui(app: tauri::AppHandle) -> Result<(), String> {
     // Spawn rclone rcd --rc-web-gui in a new terminal window

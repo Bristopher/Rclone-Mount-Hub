@@ -12,6 +12,7 @@ import {
   CloudArrowUp,
   FolderOpen,
   File,
+  AppWindow,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -90,6 +91,15 @@ export function Settings() {
     update({ rclone_config_path: "" });
     await invoke("set_rclone_config_path", { path: "" });
     toast.success("Reset to rclone default config path");
+  };
+
+  const handleAddToStartMenu = async () => {
+    try {
+      await invoke("add_to_start_menu");
+      toast.success("Added to Start Menu — notifications will now show 'Rclone Mount Hub'");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to add to Start Menu");
+    }
   };
 
   const loadDriverVersions = async () => {
@@ -295,6 +305,29 @@ export function Settings() {
                   enabled={settings.close_to_tray}
                   onChange={(val) => update({ close_to_tray: val })}
                 />
+              </div>
+
+              <div className="h-px bg-white/[0.06] my-1" />
+
+              <div className="flex items-center justify-between py-1">
+                <div>
+                  <div className="text-[13px] font-medium text-text-primary mb-0.5">
+                    Add to Start Menu
+                  </div>
+                  <div className="text-[11px] text-text-tertiary">
+                    Creates a Start Menu shortcut and registers the app so toast
+                    notifications show "Rclone Mount Hub" instead of "Windows PowerShell"
+                  </div>
+                </div>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleAddToStartMenu}
+                  className="gap-1.5 shrink-0 ml-4"
+                >
+                  <AppWindow size={14} weight="bold" />
+                  Add to Start Menu
+                </Button>
               </div>
             </div>
           </Card>
