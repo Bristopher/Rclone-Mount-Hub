@@ -1,6 +1,7 @@
 # Connection & Mount Reliability Fixes
 
-**Date:** 2026-03-25
+**Created:** 2026_03-25
+**Last Updated:** 2026_03-25
 **Scope:** 7 fixes across Rust backend and React frontend
 
 ---
