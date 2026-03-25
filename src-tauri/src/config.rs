@@ -22,6 +22,8 @@ pub struct Connection {
     pub auto_mount: bool,
     pub sort_order: i64, // u32 overflows Date.now() values
     pub created_at: String, // ISO timestamp
+    #[serde(default)]
+    pub cache_overrides: Option<CacheOverrides>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,6 +50,8 @@ pub struct SpeedProfileConfig {
     pub buffer_size: String,
     pub transfers: u32,
     pub multi_thread_streams: u32,
+    pub dir_cache_time: String,
+    pub poll_interval: String,
     pub ignore_checksum: bool,
     pub no_modtime: bool,
     pub network_mode: bool, // false = mount as local disk
@@ -63,6 +67,8 @@ impl SpeedProfile {
                 buffer_size: "512M".to_string(),
                 transfers: 16,
                 multi_thread_streams: 16,
+                dir_cache_time: "0".to_string(),
+                poll_interval: "5m".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
@@ -74,6 +80,8 @@ impl SpeedProfile {
                 buffer_size: "256M".to_string(),
                 transfers: 8,
                 multi_thread_streams: 8,
+                dir_cache_time: "0".to_string(),
+                poll_interval: "5m".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
@@ -85,6 +93,8 @@ impl SpeedProfile {
                 buffer_size: "64M".to_string(),
                 transfers: 4,
                 multi_thread_streams: 4,
+                dir_cache_time: "30s".to_string(),
+                poll_interval: "10m".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
@@ -110,6 +120,18 @@ pub enum MountState {
     Mounting,
     Unmounted,
     Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CacheOverrides {
+    pub dir_cache_time: Option<String>,
+    pub poll_interval: Option<String>,
+    pub vfs_cache_mode: Option<String>,
+    pub vfs_cache_max_size: Option<String>,
+    pub vfs_read_ahead: Option<String>,
+    pub buffer_size: Option<String>,
+    pub transfers: Option<u32>,
+    pub multi_thread_streams: Option<u32>,
 }
 
 #[allow(dead_code)]

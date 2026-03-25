@@ -277,6 +277,17 @@ pub async fn mount_drive(
     // Get speed profile configuration
     let profile_config = connection.speed_profile.get_config();
 
+    // Apply per-connection overrides
+    let overrides = connection.cache_overrides.as_ref();
+    let vfs_cache_mode = overrides.and_then(|o| o.vfs_cache_mode.clone()).unwrap_or(profile_config.vfs_cache_mode);
+    let vfs_cache_max_size = overrides.and_then(|o| o.vfs_cache_max_size.clone()).unwrap_or(profile_config.vfs_cache_max_size);
+    let vfs_read_ahead = overrides.and_then(|o| o.vfs_read_ahead.clone()).unwrap_or(profile_config.vfs_read_ahead);
+    let buffer_size = overrides.and_then(|o| o.buffer_size.clone()).unwrap_or(profile_config.buffer_size);
+    let transfers = overrides.and_then(|o| o.transfers).unwrap_or(profile_config.transfers);
+    let multi_thread_streams = overrides.and_then(|o| o.multi_thread_streams).unwrap_or(profile_config.multi_thread_streams);
+    let dir_cache_time = overrides.and_then(|o| o.dir_cache_time.clone()).unwrap_or(profile_config.dir_cache_time);
+    let poll_interval = overrides.and_then(|o| o.poll_interval.clone()).unwrap_or(profile_config.poll_interval);
+
     // Build rclone mount command
     let drive = format!("{}:", connection.drive_letter);
     let remote = format!("{}:", connection.name);
@@ -289,17 +300,21 @@ pub async fn mount_drive(
         "--webdav-url".to_string(),
         url.clone(),
         "--vfs-cache-mode".to_string(),
-        profile_config.vfs_cache_mode,
+        vfs_cache_mode,
         "--vfs-cache-max-size".to_string(),
-        profile_config.vfs_cache_max_size,
+        vfs_cache_max_size,
         "--vfs-read-ahead".to_string(),
-        profile_config.vfs_read_ahead,
+        vfs_read_ahead,
         "--buffer-size".to_string(),
-        profile_config.buffer_size,
+        buffer_size,
         "--transfers".to_string(),
-        profile_config.transfers.to_string(),
+        transfers.to_string(),
         "--multi-thread-streams".to_string(),
-        profile_config.multi_thread_streams.to_string(),
+        multi_thread_streams.to_string(),
+        "--dir-cache-time".to_string(),
+        dir_cache_time,
+        "--poll-interval".to_string(),
+        poll_interval,
         format!("--volname={}", connection.name),
     ]);
 
