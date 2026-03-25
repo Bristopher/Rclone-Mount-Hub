@@ -251,26 +251,63 @@ pub async fn mount_drive(
         .map_err(|e| format!("Invalid connection data: {}", e))?;
 
     // Detect which network to use
-    let (url, active_mode) = match connection.network_mode {
+    use crate::commands::network::ping_port;
+    let local_ip = &connection.local_ip;
+    let tailscale_ip = &connection.tailscale_ip;
+    let port = connection.port;
+
+    let (url, active_mode, mount_log) = match connection.network_mode {
         NetworkMode::Auto => {
-            // Try local first, fall back to tailscale
-            let local_ip = &connection.local_ip;
-            let port = connection.port;
-
-            use crate::commands::network::ping_port;
-            let is_local_reachable = ping_port(local_ip.clone(), port, 1000).await?;
-
-            if is_local_reachable {
-                (format!("http://{}:{}", local_ip, port), "local".to_string())
+            let local_reachable = if !local_ip.is_empty() {
+                ping_port(local_ip.clone(), port, 1500).await.unwrap_or(false)
             } else {
-                (format!("http://{}:{}", connection.tailscale_ip, port), "tailscale".to_string())
+                false
+            };
+            let tailscale_reachable = if !tailscale_ip.is_empty() {
+                ping_port(tailscale_ip.clone(), port, 1500).await.unwrap_or(false)
+            } else {
+                false
+            };
+
+            if local_reachable {
+                let log = if !tailscale_ip.is_empty() && !tailscale_reachable {
+                    format!("Local {}:{} reachable. Tailscale {}:{} unreachable.", local_ip, port, tailscale_ip, port)
+                } else {
+                    format!("Local {}:{} reachable.", local_ip, port)
+                };
+                (format!("http://{}:{}", local_ip, port), "local".to_string(), log)
+            } else if tailscale_reachable {
+                let log = format!("Local {}:{} unreachable, connected via Tailscale ({}:{}).", local_ip, port, tailscale_ip, port);
+                (format!("http://{}:{}", tailscale_ip, port), "tailscale".to_string(), log)
+            } else {
+                let mut msg = format!("Neither local ({}:{}) nor Tailscale ({}:{}) is reachable.", local_ip, port, tailscale_ip, port);
+                if local_ip.is_empty() && tailscale_ip.is_empty() {
+                    msg = "No local or Tailscale IP configured.".to_string();
+                }
+                return Err(format!("{} Check that your server is running and accessible.", msg));
             }
         },
         NetworkMode::Local => {
-            (format!("http://{}:{}", connection.local_ip, connection.port), "local".to_string())
+            if local_ip.is_empty() {
+                return Err("No local IP configured for this connection.".to_string());
+            }
+            let reachable = ping_port(local_ip.clone(), port, 2000).await.unwrap_or(false);
+            if !reachable {
+                return Err(format!("Local IP {}:{} is not reachable. Check that your server is running.", local_ip, port));
+            }
+            let log = format!("Local {}:{} reachable.", local_ip, port);
+            (format!("http://{}:{}", local_ip, port), "local".to_string(), log)
         },
         NetworkMode::Tailscale => {
-            (format!("http://{}:{}", connection.tailscale_ip, connection.port), "tailscale".to_string())
+            if tailscale_ip.is_empty() {
+                return Err("No Tailscale IP configured for this connection.".to_string());
+            }
+            let reachable = ping_port(tailscale_ip.clone(), port, 2000).await.unwrap_or(false);
+            if !reachable {
+                return Err(format!("Tailscale IP {}:{} is not reachable. Check that Tailscale is connected.", tailscale_ip, port));
+            }
+            let log = format!("Tailscale {}:{} reachable.", tailscale_ip, port);
+            (format!("http://{}:{}", tailscale_ip, port), "tailscale".to_string(), log)
         },
     };
 
@@ -375,6 +412,7 @@ pub async fn mount_drive(
         active_url: Some(url),
         pid: Some(pid),
         error: None,
+        log: Some(mount_log),
     })
 }
 
@@ -428,6 +466,7 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
                 active_url: Some(mount_info.active_url.clone()),
                 pid: Some(mount_info.pid),
                 error: None,
+                log: None,
             })
         } else {
             // Process died, remove from tracking
@@ -439,6 +478,7 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
                 active_url: None,
                 pid: None,
                 error: Some("Process terminated unexpectedly".to_string()),
+                log: None,
             })
         }
     } else {
@@ -449,6 +489,7 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
             active_url: None,
             pid: None,
             error: None,
+            log: None,
         })
     }
 }
@@ -469,6 +510,7 @@ pub async fn get_all_mount_statuses() -> Result<Vec<MountStatus>, String> {
                 active_url: Some(mount_info.active_url.clone()),
                 pid: Some(mount_info.pid),
                 error: None,
+                log: None,
             });
         }
     }

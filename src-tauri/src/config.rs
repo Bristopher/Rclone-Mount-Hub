@@ -111,6 +111,7 @@ pub struct MountStatus {
     pub active_url: Option<String>,
     pub pid: Option<u32>,
     pub error: Option<String>,
+    pub log: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
