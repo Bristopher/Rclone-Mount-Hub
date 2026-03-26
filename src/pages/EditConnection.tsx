@@ -110,21 +110,52 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
     if (!validateForm()) return;
     setTesting(true);
     setTestResult(null);
-    addLog("info", `Testing connection to ${host}:${port}...`, "network");
+
     try {
-      const reachable = await invoke<boolean>("ping_port", {
+      let anySuccess = false;
+      const testPort = parseInt(port) || 0;
+
+      // Test local IP
+      addLog("info", `Testing local ${host}:${testPort}...`, "network");
+      const localReachable = await invoke<boolean>("ping_port", {
         ip: host,
-        port: parseInt(port),
+        port: testPort,
         timeoutMs: 3000,
       });
-      if (reachable) {
+      if (localReachable) {
+        addLog("success", `Local (${host}:${testPort}): reachable`, "network");
+        anySuccess = true;
+      } else {
+        addLog("error", `Local (${host}:${testPort}): unreachable`, "network");
+      }
+
+      // Test tailscale IP if provided
+      let tailscaleReachable = false;
+      if (tailscaleIp.trim()) {
+        addLog("info", `Testing Tailscale ${tailscaleIp}:${testPort}...`, "network");
+        tailscaleReachable = await invoke<boolean>("ping_port", {
+          ip: tailscaleIp,
+          port: testPort,
+          timeoutMs: 3000,
+        });
+        if (tailscaleReachable) {
+          addLog("success", `Tailscale (${tailscaleIp}:${testPort}): reachable`, "network");
+          anySuccess = true;
+        } else {
+          addLog("error", `Tailscale (${tailscaleIp}:${testPort}): unreachable`, "network");
+        }
+      }
+
+      const localLabel = localReachable ? "Local: OK" : "Local: Failed";
+      const tsLabel = tailscaleIp.trim() ? (tailscaleReachable ? "Tailscale: OK" : "Tailscale: Failed") : "";
+      const summary = [localLabel, tsLabel].filter(Boolean).join(", ");
+
+      if (anySuccess) {
         setTestResult("success");
-        addLog("success", `${host}:${port} is reachable`, "network");
-        toast.success("Connection test passed");
+        toast.success(summary);
       } else {
         setTestResult("error");
-        addLog("error", `Cannot reach ${host}:${port}`, "network");
-        toast.error(`Cannot reach ${host}:${port}`);
+        toast.error(summary);
       }
     } catch (err) {
       setTestResult("error");

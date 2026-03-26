@@ -217,34 +217,59 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
     setTesting(true);
     setTestResult(null);
 
-    const testHost = getTestHost();
-    const testPort = getTestPort();
-
-    addLog("info", `Testing connection to ${testHost}${testPort ? `:${testPort}` : ""}...`, "network");
-
     try {
       if (remoteType === "s3") {
-        // For S3 we can't easily port-ping; just confirm fields are filled
         toast.success("S3 config looks valid (start mount to verify credentials)");
         setTestResult("success");
         setTesting(false);
         return;
       }
 
-      const reachable = await invoke<boolean>("ping_port", {
+      const testHost = getTestHost();
+      const testPort = getTestPort();
+      let anySuccess = false;
+
+      // Test local IP
+      addLog("info", `Testing local ${testHost}:${testPort}...`, "network");
+      const localReachable = await invoke<boolean>("ping_port", {
         ip: testHost,
         port: testPort,
         timeoutMs: 3000,
       });
+      if (localReachable) {
+        addLog("success", `Local (${testHost}:${testPort}): reachable`, "network");
+        anySuccess = true;
+      } else {
+        addLog("error", `Local (${testHost}:${testPort}): unreachable`, "network");
+      }
 
-      if (reachable) {
+      // Test tailscale IP if provided
+      let tailscaleReachable = false;
+      if (tailscaleIp.trim()) {
+        addLog("info", `Testing Tailscale ${tailscaleIp}:${testPort}...`, "network");
+        tailscaleReachable = await invoke<boolean>("ping_port", {
+          ip: tailscaleIp,
+          port: testPort,
+          timeoutMs: 3000,
+        });
+        if (tailscaleReachable) {
+          addLog("success", `Tailscale (${tailscaleIp}:${testPort}): reachable`, "network");
+          anySuccess = true;
+        } else {
+          addLog("error", `Tailscale (${tailscaleIp}:${testPort}): unreachable`, "network");
+        }
+      }
+
+      const localLabel = localReachable ? "Local: OK" : "Local: Failed";
+      const tsLabel = tailscaleIp.trim() ? (tailscaleReachable ? "Tailscale: OK" : "Tailscale: Failed") : "";
+      const summary = [localLabel, tsLabel].filter(Boolean).join(", ");
+
+      if (anySuccess) {
         setTestResult("success");
-        addLog("success", `${testHost}:${testPort} is reachable`, "network");
-        toast.success("Connection test passed");
+        toast.success(summary);
       } else {
         setTestResult("error");
-        addLog("error", `Cannot reach ${testHost}:${testPort}`, "network");
-        toast.error(`Cannot reach ${testHost}:${testPort}`);
+        toast.error(summary);
       }
     } catch (err) {
       setTestResult("error");
