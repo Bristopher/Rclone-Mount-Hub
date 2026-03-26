@@ -396,6 +396,44 @@ pub async fn mount_drive(
         ));
     }
 
+    // Verify the drive letter actually appeared in the filesystem
+    #[cfg(target_os = "windows")]
+    {
+        let drive_path = format!("{}:\\", connection.drive_letter.to_uppercase());
+        let mut visible = false;
+        for _attempt in 0..5 {
+            if std::path::Path::new(&drive_path).exists() {
+                visible = true;
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
+        if !visible {
+            // Store mount info so user can still unmount it
+            insert_mount(connection.id.clone(), MountInfo {
+                _connection_id: connection.id.clone(),
+                pid,
+                _drive_letter: connection.drive_letter.clone(),
+                active_mode: active_mode.clone(),
+                active_url: url.clone(),
+            });
+
+            return Ok(MountStatus {
+                connection_id: connection.id,
+                state: MountState::Mounted,
+                active_mode: Some(active_mode),
+                active_url: Some(url),
+                pid: Some(pid),
+                error: Some(format!(
+                    "Drive {}:\\ not visible in Explorer. rclone running (PID {}). Possible causes: WinFsp issue, drive letter conflict, or auth failure.",
+                    connection.drive_letter.to_uppercase(), pid
+                )),
+                log: Some(mount_log),
+            });
+        }
+    }
+
     // Store mount info
     insert_mount(connection.id.clone(), MountInfo {
         _connection_id: connection.id.clone(),
