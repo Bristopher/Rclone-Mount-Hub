@@ -14,6 +14,8 @@ import {
   FloppyDisk,
   CaretLeft,
   CaretRight,
+  CaretDown,
+  Gear,
 } from "phosphor-react";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -22,7 +24,7 @@ import { useConnectionStore } from "../lib/store";
 import { useLogStore } from "../lib/logStore";
 import { invoke } from "@tauri-apps/api/core";
 import { toast } from "sonner";
-import type { Connection } from "../lib/types";
+import type { Connection, CacheOverrides } from "../lib/types";
 
 interface EditConnectionProps {
   connection: Connection;
@@ -58,6 +60,10 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
   const [speedProfile, setSpeedProfile] = useState(connection.speed_profile);
   const [autoMount, setAutoMount] = useState(connection.auto_mount);
   const [webdavVendor, setWebdavVendor] = useState("copyparty");
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [cacheOverrides, setCacheOverrides] = useState<Partial<CacheOverrides>>(
+    connection.cache_overrides || {}
+  );
 
   useEffect(() => {
     invoke<string[]>("get_available_drives").then((letters) => {
@@ -212,6 +218,7 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
         network_mode: networkMode,
         speed_profile: speedProfile,
         auto_mount: autoMount,
+        cache_overrides: Object.values(cacheOverrides).some(v => v !== undefined) ? cacheOverrides as CacheOverrides : undefined,
       };
 
       update(connection.id, updates);
@@ -454,6 +461,116 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
                 </button>
               ))}
             </div>
+          </Card>
+
+          {/* Advanced Cache Settings */}
+          <Card className="p-6">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="w-full flex items-center justify-between"
+            >
+              <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                <Gear size={18} weight="duotone" className="text-text-tertiary" />
+                Advanced Cache Settings
+              </h2>
+              <div className="flex items-center gap-2">
+                {!showAdvanced && (
+                  <span className="text-[11px] text-text-tertiary">
+                    Using {speedProfile} profile defaults
+                  </span>
+                )}
+                <CaretDown
+                  size={14}
+                  weight="bold"
+                  className={`text-text-tertiary transition-transform ${showAdvanced ? "rotate-180" : ""}`}
+                />
+              </div>
+            </button>
+            {showAdvanced && (
+              <div className="mt-4 space-y-4">
+                <p className="text-[11px] text-text-tertiary">
+                  Leave blank to use the speed profile defaults. Dir Cache Time: how long directory listings are cached (0 = always fresh). Poll Interval: how often rclone checks for remote changes.
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Dir Cache Time"
+                    placeholder={speedProfile === "low" ? "30s" : "0"}
+                    value={cacheOverrides.dir_cache_time || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, dir_cache_time: e.target.value || undefined })}
+                    hint="0 = always fresh on navigate"
+                  />
+                  <Input
+                    label="Poll Interval"
+                    placeholder={speedProfile === "low" ? "10m" : "5m"}
+                    value={cacheOverrides.poll_interval || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, poll_interval: e.target.value || undefined })}
+                    hint="Background check interval"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                      VFS Cache Mode
+                    </label>
+                    <select
+                      value={cacheOverrides.vfs_cache_mode || ""}
+                      onChange={(e) => setCacheOverrides({ ...cacheOverrides, vfs_cache_mode: e.target.value || undefined })}
+                      className="w-full bg-bg-overlay border border-border-default rounded-lg px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-accent-blue/60"
+                    >
+                      <option value="">Default (full)</option>
+                      <option value="full">Full</option>
+                      <option value="writes">Writes</option>
+                      <option value="minimal">Minimal</option>
+                      <option value="off">Off</option>
+                    </select>
+                  </div>
+                  <Input
+                    label="VFS Cache Size"
+                    placeholder={speedProfile === "max" ? "50G" : speedProfile === "balanced" ? "10G" : "2G"}
+                    value={cacheOverrides.vfs_cache_max_size || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, vfs_cache_max_size: e.target.value || undefined })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Read Ahead"
+                    placeholder={speedProfile === "max" ? "512M" : speedProfile === "balanced" ? "128M" : "32M"}
+                    value={cacheOverrides.vfs_read_ahead || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, vfs_read_ahead: e.target.value || undefined })}
+                  />
+                  <Input
+                    label="Buffer Size"
+                    placeholder={speedProfile === "max" ? "512M" : speedProfile === "balanced" ? "256M" : "64M"}
+                    value={cacheOverrides.buffer_size || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, buffer_size: e.target.value || undefined })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Input
+                    label="Transfers"
+                    type="number"
+                    placeholder={speedProfile === "max" ? "16" : speedProfile === "balanced" ? "8" : "4"}
+                    value={cacheOverrides.transfers?.toString() || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, transfers: e.target.value ? parseInt(e.target.value) : undefined })}
+                  />
+                  <Input
+                    label="Multi-thread Streams"
+                    type="number"
+                    placeholder={speedProfile === "max" ? "16" : speedProfile === "balanced" ? "8" : "4"}
+                    value={cacheOverrides.multi_thread_streams?.toString() || ""}
+                    onChange={(e) => setCacheOverrides({ ...cacheOverrides, multi_thread_streams: e.target.value ? parseInt(e.target.value) : undefined })}
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setCacheOverrides({})}
+                  className="text-text-tertiary"
+                >
+                  Reset to Profile Defaults
+                </Button>
+              </div>
+            )}
           </Card>
 
           {/* Auto-mount */}
