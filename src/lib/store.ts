@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   default_network_mode: "auto",
   show_notifications: true,
   rclone_config_path: "",
+  network_change_mode: "notify",
 };
 
 // Settings Store

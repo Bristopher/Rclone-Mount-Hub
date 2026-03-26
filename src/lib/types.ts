@@ -4,23 +4,24 @@ export interface Connection {
   id: string;
   name: string;
   description: string;
-  remote_type: string; // rclone remote type: webdav, sftp, smb, s3, ftp, etc.
+  remote_type: string;
   local_ip: string;
   tailscale_ip: string;
   port: number;
   drive_letter: string;
   protocol: "webdav";
   username: string;
-  // Password is NOT stored - it's in rclone config
   network_mode: NetworkMode;
   speed_profile: SpeedProfile;
   auto_mount: boolean;
   sort_order: number;
-  created_at: string; // ISO timestamp
+  created_at: string;
+  cache_overrides?: CacheOverrides;
 }
 
 export type NetworkMode = "auto" | "local" | "tailscale";
 export type SpeedProfile = "max" | "balanced" | "low";
+export type NetworkChangeMode = "notify" | "auto_reconnect";
 
 export interface MountStatus {
   connection_id: string;
@@ -29,9 +30,21 @@ export interface MountStatus {
   active_url: string | null;
   pid: number | null;
   error: string | null;
+  log: string | null;
 }
 
 export type MountState = "mounted" | "mounting" | "unmounted" | "error";
+
+export interface CacheOverrides {
+  dir_cache_time?: string;
+  poll_interval?: string;
+  vfs_cache_mode?: string;
+  vfs_cache_max_size?: string;
+  vfs_read_ahead?: string;
+  buffer_size?: string;
+  transfers?: number;
+  multi_thread_streams?: number;
+}
 
 export interface AppSettings {
   start_with_windows: boolean;
@@ -41,8 +54,8 @@ export interface AppSettings {
   default_speed_profile: SpeedProfile;
   default_network_mode: NetworkMode;
   show_notifications: boolean;
-  /** Empty string = use rclone's own default (~/.config/rclone/rclone.conf or %APPDATA%\rclone\rclone.conf) */
   rclone_config_path: string;
+  network_change_mode: NetworkChangeMode;
 }
 
 export interface SpeedProfileInfo {
