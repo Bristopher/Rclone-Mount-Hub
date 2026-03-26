@@ -282,6 +282,72 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   };
 
+  const handleTestConnection = async (conn: Connection) => {
+    const key = `test-${conn.id}`;
+    setLoading({ ...loading, [key]: true });
+    addLog("info", `Testing connection for ${conn.name}...`, "network");
+
+    try {
+      const status = mountStatuses[conn.id];
+      const activeUrl = status?.state === "mounted" ? status.active_url : null;
+
+      const result = await invoke<{
+        local_reachable: boolean | null;
+        local_ip: string;
+        tailscale_reachable: boolean | null;
+        tailscale_ip: string;
+        active_url_reachable: boolean | null;
+        active_url: string;
+        local_error: string | null;
+        tailscale_error: string | null;
+      }>("test_connection", {
+        connectionJson: JSON.stringify(conn),
+        activeUrl,
+      });
+
+      if (result.local_reachable !== null) {
+        if (result.local_reachable) {
+          addLog("success", `Local (${result.local_ip}:${conn.port}): reachable`, "network");
+        } else {
+          addLog("error", `Local (${result.local_ip}:${conn.port}): unreachable${result.local_error ? ` — ${result.local_error}` : ""}`, "network");
+        }
+      }
+
+      if (result.tailscale_reachable !== null) {
+        if (result.tailscale_reachable) {
+          addLog("success", `Tailscale (${result.tailscale_ip}:${conn.port}): reachable`, "network");
+        } else {
+          addLog("error", `Tailscale (${result.tailscale_ip}:${conn.port}): unreachable${result.tailscale_error ? ` — ${result.tailscale_error}` : ""}`, "network");
+        }
+      }
+
+      if (result.active_url_reachable !== null) {
+        if (result.active_url_reachable) {
+          addLog("success", `Active mount (${result.active_url}): reachable`, "network");
+        } else {
+          addLog("error", `Active mount (${result.active_url}): unreachable`, "network");
+        }
+      }
+
+      const localStatus = result.local_reachable === null ? "" : result.local_reachable ? "Local: OK" : "Local: Failed";
+      const tsStatus = result.tailscale_reachable === null ? "" : result.tailscale_reachable ? "Tailscale: OK" : "Tailscale: Failed";
+      const parts = [localStatus, tsStatus].filter(Boolean).join(", ");
+      const anySuccess = result.local_reachable || result.tailscale_reachable;
+
+      if (anySuccess) {
+        toast.success(parts);
+      } else {
+        toast.error(parts || "No IPs configured to test");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog("error", `Test failed: ${msg}`, "network");
+      toast.error(msg);
+    } finally {
+      setLoading({ ...loading, [key]: false });
+    }
+  };
+
   const handleDelete = async (conn: Connection) => {
     if (!confirm(`Delete connection "${conn.name}"? This cannot be undone.`)) {
       return;
@@ -517,6 +583,19 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                           Mount
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTestConnection(conn)}
+                        disabled={loading[`test-${conn.id}`]}
+                        title="Test connection"
+                      >
+                        {loading[`test-${conn.id}`] ? (
+                          <div className="w-3.5 h-3.5 border-2 border-text-primary/30 border-t-text-primary rounded-full animate-spin" />
+                        ) : (
+                          <WifiHigh size={14} weight="bold" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
