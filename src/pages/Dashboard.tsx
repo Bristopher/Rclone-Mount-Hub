@@ -201,9 +201,20 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       });
       setMountStatuses({ ...mountStatuses, [conn.id]: status });
 
+      if (status.log) {
+        addLog("info", status.log, "network");
+      }
+
       const mode = status.active_mode === "local" ? "LAN" : "Tailscale";
-      addLog("success", `${conn.name} mounted successfully via ${mode}`, "mounts");
-      toast.success(`Mounted ${conn.name} to drive ${conn.drive_letter}:`);
+      const url = status.active_url?.replace("http://", "") || "";
+
+      if (status.error) {
+        addLog("warning", status.error, "mounts");
+        toast.warning(`${conn.name} mounted via ${mode} (${url}) with warning: ${status.error}`);
+      } else {
+        addLog("success", `${conn.name} mounted to ${conn.drive_letter}: via ${mode} (${url})`, "mounts");
+        toast.success(`Mounted ${conn.name} to drive ${conn.drive_letter}: via ${mode}`);
+      }
 
       try {
         await invoke("send_notification", {
@@ -433,9 +444,15 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                           {conn.name}
                         </h3>
                         {isMounted ? (
-                          <Badge variant="connected" dot>
-                            Mounted
-                          </Badge>
+                          status?.error ? (
+                            <Badge variant="default" dot>
+                              Mounted (Warning)
+                            </Badge>
+                          ) : (
+                            <Badge variant="connected" dot>
+                              Mounted
+                            </Badge>
+                          )
                         ) : (
                           <Badge variant="disconnected">Unmounted</Badge>
                         )}
@@ -455,9 +472,17 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         </div>
                       )}
                       <div className="text-[13px] text-text-secondary">
-                        {conn.remote_type?.toUpperCase() || "WEBDAV"} &bull; Drive {conn.drive_letter}: &bull; {conn.local_ip}:{conn.port} &bull;{" "}
+                        {conn.remote_type?.toUpperCase() || "WEBDAV"} &bull; Drive {conn.drive_letter}: &bull;{" "}
+                        {isMounted && status?.active_url
+                          ? status.active_url.replace("http://", "")
+                          : `${conn.local_ip}:${conn.port}`} &bull;{" "}
                         {conn.speed_profile} profile
                       </div>
+                      {isMounted && status?.error && (
+                        <div className="text-[11px] text-accent-amber mt-1">
+                          {status.error}
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
