@@ -27,3 +27,5 @@ uuid = { version = "1", features = ["v4", "serde"] }
 velopack = { version = "0.0", features = ["async"] }
 tauri-plugin-mcp-bridge = "0.8.2"
 
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = ["Win32_NetworkManagement_IpHelper", "Win32_Foundation", "Win32_System_IO"] }

@@ -1,6 +1,7 @@
 // Network detection commands
 
 use tauri::command;
+use tauri::Emitter;
 use std::net::TcpStream;
 use std::time::Duration;
 
@@ -129,4 +130,37 @@ pub async fn test_connection(
         local_error,
         tailscale_error,
     })
+}
+
+#[cfg(target_os = "windows")]
+pub fn start_network_monitor(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        loop {
+            // NotifyAddrChange with synchronous blocking — zero CPU while waiting
+            unsafe {
+                let mut handle = windows::Win32::Foundation::HANDLE::default();
+                let result = windows::Win32::NetworkManagement::IpHelper::NotifyAddrChange(
+                    &mut handle,
+                    std::ptr::null(),
+                );
+                if result != 0 {
+                    // If the API fails, fall back to polling every 30s
+                    std::thread::sleep(std::time::Duration::from_secs(30));
+                    app.emit("network-changed", ()).ok();
+                    continue;
+                }
+            }
+
+            // Debounce — network changes often fire multiple rapid events
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            // Emit event to frontend
+            app.emit("network-changed", ()).ok();
+        }
+    });
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn start_network_monitor(_app: tauri::AppHandle) {
+    // Network change detection not supported on non-Windows platforms
 }

@@ -134,6 +134,9 @@ pub fn run() {
                 }
             }
 
+            // Start background network change monitor
+            commands::network::start_network_monitor(app.handle().clone());
+
             Ok(())
         });
 
