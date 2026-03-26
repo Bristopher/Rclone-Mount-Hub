@@ -539,6 +539,57 @@ export function Settings() {
             </div>
           </Card>
 
+          {/* Section D2 - Network Change Behavior */}
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-text-primary mb-4 flex items-center gap-2">
+              <Globe size={18} weight="duotone" className="text-accent-green" />
+              Network Change Behavior
+            </h2>
+            <p className="text-[11px] text-text-tertiary mb-4">
+              When your network changes (e.g., moving between home WiFi and mobile), the app detects it using Windows network events (zero polling, no battery impact).
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                {
+                  value: "notify" as const,
+                  label: "Notify Only",
+                  desc: "Shows a notification when a mounted drive should switch between LAN and Tailscale. You control when to reconnect.",
+                },
+                {
+                  value: "auto_reconnect" as const,
+                  label: "Auto-Reconnect",
+                  desc: "Automatically remounts drives on the correct IP. Brief ~2-3s interruption during switch.",
+                },
+              ].map((mode) => (
+                <button
+                  key={mode.value}
+                  onClick={() => update({ network_change_mode: mode.value })}
+                  className={`p-3 rounded-lg border transition-all duration-150 text-left ${
+                    settings.network_change_mode === mode.value
+                      ? "bg-accent-green/10 border-accent-green/40 shadow-[0_0_12px_rgba(34,197,94,0.15)]"
+                      : "bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className={`text-[13px] font-medium ${
+                        settings.network_change_mode === mode.value
+                          ? "text-accent-green"
+                          : "text-text-primary"
+                      }`}
+                    >
+                      {mode.label}
+                    </span>
+                    {settings.network_change_mode === mode.value && (
+                      <Check size={14} weight="bold" className="text-accent-green" />
+                    )}
+                  </div>
+                  <span className="text-[11px] text-text-tertiary">{mode.desc}</span>
+                </button>
+              ))}
+            </div>
+          </Card>
+
           {/* Section E - Rclone Config Path */}
           <Card className="p-6">
             <h2 className="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">

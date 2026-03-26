@@ -17,7 +17,7 @@ import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { Badge } from "../components/ui/Badge";
 import { ConnectionCardSkeleton, StatCardsSkeleton } from "../components/ui/Skeleton";
-import { useConnectionStore, useMountSummaryStore } from "../lib/store";
+import { useConnectionStore, useMountSummaryStore, useSettingsStore } from "../lib/store";
 import { useLogStore } from "../lib/logStore";
 import type { Connection, MountStatus } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
@@ -50,6 +50,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { connections, remove } = useConnectionStore();
   const { addLog } = useLogStore();
   const { setMountSummary } = useMountSummaryStore();
+  const { settings } = useSettingsStore();
   const [mountStatuses, setMountStatuses] = useState<Record<string, MountStatus>>({});
   const [driverVersions, setDriverVersions] = useState<DriverVersions | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
@@ -117,6 +118,75 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     // Update system tray menu with active mounts
     invoke("update_tray_menu", { mountEntries: allEntries }).catch(console.error);
   }, [mountStatuses, externalMounts, connections, setMountSummary]);
+
+  // Handle network change events
+  useEffect(() => {
+    const handler = async () => {
+      addLog("info", "Network change detected, checking connections...", "network");
+
+      for (const conn of connections) {
+        const status = mountStatuses[conn.id];
+        if (status?.state !== "mounted" || conn.network_mode !== "auto") continue;
+
+        const activeMode = status.active_mode;
+        const localIp = conn.local_ip;
+        const tailscaleIp = conn.tailscale_ip;
+        const port = conn.port;
+
+        let localReachable = false;
+        let tailscaleReachable = false;
+
+        try {
+          if (localIp) {
+            localReachable = await invoke<boolean>("ping_port", { ip: localIp, port, timeoutMs: 2000 });
+          }
+          if (tailscaleIp) {
+            tailscaleReachable = await invoke<boolean>("ping_port", { ip: tailscaleIp, port, timeoutMs: 2000 });
+          }
+        } catch {
+          continue;
+        }
+
+        const needsSwitch =
+          (activeMode === "local" && !localReachable && tailscaleReachable) ||
+          (activeMode === "tailscale" && localReachable);
+
+        if (!needsSwitch) continue;
+
+        const newMode = localReachable ? "LAN" : "Tailscale";
+
+        if (settings.network_change_mode === "auto_reconnect") {
+          addLog("info", `Network changed: remounting ${conn.name} to ${newMode}...`, "network");
+          try {
+            await invoke("unmount_drive", { connectionId: conn.id });
+            const newStatus = await invoke<MountStatus>("mount_drive", {
+              connectionJson: JSON.stringify(conn),
+            });
+            setMountStatuses(prev => ({ ...prev, [conn.id]: newStatus }));
+            addLog("success", `${conn.name} reconnected via ${newMode}`, "network");
+            toast.info(`${conn.name} switched to ${newMode}`);
+            await invoke("send_notification", {
+              title: "Network Changed",
+              body: `${conn.name} reconnected via ${newMode}`,
+            }).catch(() => {});
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            addLog("error", `Failed to reconnect ${conn.name}: ${msg}`, "network");
+          }
+        } else {
+          addLog("warning", `Network changed: ${conn.name} is on ${activeMode === "local" ? "LAN" : "Tailscale"} but ${newMode} is now available. Consider reconnecting.`, "network");
+          toast.warning(`${conn.name}: switch to ${newMode} available`, { duration: 10000 });
+          await invoke("send_notification", {
+            title: "Network Changed",
+            body: `${conn.name} may need to switch to ${newMode}`,
+          }).catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener("network-changed", handler);
+    return () => window.removeEventListener("network-changed", handler);
+  }, [connections, mountStatuses, settings.network_change_mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const autoMountConnections = async () => {
     // Fetch external mounts first so we don't try to mount already-occupied drive letters

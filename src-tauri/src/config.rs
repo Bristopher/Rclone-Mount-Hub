@@ -135,6 +135,19 @@ pub struct CacheOverrides {
     pub multi_thread_streams: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkChangeMode {
+    Notify,
+    AutoReconnect,
+}
+
+impl Default for NetworkChangeMode {
+    fn default() -> Self {
+        NetworkChangeMode::Notify
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -145,6 +158,8 @@ pub struct AppSettings {
     pub default_speed_profile: SpeedProfile,
     pub default_network_mode: NetworkMode,
     pub show_notifications: bool,
+    #[serde(default)]
+    pub network_change_mode: NetworkChangeMode,
 }
 
 impl Default for AppSettings {
@@ -157,6 +172,7 @@ impl Default for AppSettings {
             default_speed_profile: SpeedProfile::Balanced,
             default_network_mode: NetworkMode::Auto,
             show_notifications: true,
+            network_change_mode: NetworkChangeMode::default(),
         }
     }
 }

@@ -8,6 +8,7 @@ import { Settings } from "./pages/Settings";
 import { Export } from "./pages/Export";
 import { SpeedTest } from "./pages/SpeedTest";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, useConnectionStore } from "./lib/store";
 import type { Connection } from "./lib/types";
@@ -51,6 +52,17 @@ function App() {
       unlisten.then(fn => fn());
     };
   }, [settings.close_to_tray]);
+
+  // Listen for network change events from Rust backend
+  useEffect(() => {
+    const unlisten = listen("network-changed", () => {
+      window.dispatchEvent(new CustomEvent("network-changed"));
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
 
   const renderPage = () => {
     switch (currentPage) {
