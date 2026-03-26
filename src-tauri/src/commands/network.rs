@@ -56,3 +56,77 @@ pub async fn detect_network_mode(local_ip: String, port: u16) -> Result<String, 
         Ok("tailscale".to_string())
     }
 }
+
+#[derive(Debug, serde::Serialize)]
+pub struct ConnectionTestResult {
+    pub local_reachable: Option<bool>,
+    pub local_ip: String,
+    pub tailscale_reachable: Option<bool>,
+    pub tailscale_ip: String,
+    pub active_url_reachable: Option<bool>,
+    pub active_url: String,
+    pub local_error: Option<String>,
+    pub tailscale_error: Option<String>,
+}
+
+#[command]
+pub async fn test_connection(
+    connection_json: String,
+    active_url: Option<String>,
+) -> Result<ConnectionTestResult, String> {
+    let connection: crate::config::Connection = serde_json::from_str(&connection_json)
+        .map_err(|e| format!("Invalid connection data: {}", e))?;
+
+    let port = connection.port;
+    let local_ip = connection.local_ip.clone();
+    let tailscale_ip = connection.tailscale_ip.clone();
+
+    // Test local IP
+    let (local_reachable, local_error) = if !local_ip.is_empty() {
+        match ping_port(local_ip.clone(), port, 3000).await {
+            Ok(true) => (Some(true), None),
+            Ok(false) => (Some(false), Some(format!("{}:{} did not respond within 3s", local_ip, port))),
+            Err(e) => (Some(false), Some(e)),
+        }
+    } else {
+        (None, None)
+    };
+
+    // Test tailscale IP
+    let (tailscale_reachable, tailscale_error) = if !tailscale_ip.is_empty() {
+        match ping_port(tailscale_ip.clone(), port, 3000).await {
+            Ok(true) => (Some(true), None),
+            Ok(false) => (Some(false), Some(format!("{}:{} did not respond within 3s", tailscale_ip, port))),
+            Err(e) => (Some(false), Some(e)),
+        }
+    } else {
+        (None, None)
+    };
+
+    // Test active URL if mount is active
+    let (active_url_reachable, active_url_str) = if let Some(ref url) = active_url {
+        let stripped = url.replace("http://", "").replace("https://", "");
+        let parts: Vec<&str> = stripped.split(':').collect();
+        if parts.len() == 2 {
+            let ip = parts[0].to_string();
+            let p: u16 = parts[1].parse().unwrap_or(80);
+            let reachable = ping_port(ip, p, 3000).await.unwrap_or(false);
+            (Some(reachable), url.clone())
+        } else {
+            (None, url.clone())
+        }
+    } else {
+        (None, String::new())
+    };
+
+    Ok(ConnectionTestResult {
+        local_reachable,
+        local_ip,
+        tailscale_reachable,
+        tailscale_ip,
+        active_url_reachable,
+        active_url: active_url_str,
+        local_error,
+        tailscale_error,
+    })
+}

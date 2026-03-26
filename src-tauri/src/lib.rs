@@ -43,6 +43,7 @@ pub fn run() {
             commands::ping_host,
             commands::ping_port,
             commands::detect_network_mode,
+            commands::test_connection,
             // System commands
             commands::install_rclone,
             commands::install_winfsp,
