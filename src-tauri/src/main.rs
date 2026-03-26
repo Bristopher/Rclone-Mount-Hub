@@ -4,7 +4,7 @@
 fn main() {
     // Must be called before anything else — handles install/update/uninstall hooks
     velopack::VelopackApp::build()
-        .on_app_uninstall(|_version| {
+        .on_before_uninstall(|_version| {
             // Clean up Tauri plugin store data left in %AppData%
             if let Ok(app_data) = std::env::var("APPDATA") {
                 let _ = std::fs::remove_dir_all(
