@@ -4,6 +4,16 @@ use tauri::command;
 use tauri_plugin_shell::ShellExt;
 use serde::{Serialize, Deserialize};
 
+#[command]
+pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[command]
+pub async fn read_text_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DriverVersions {
     pub rclone_installed: bool,

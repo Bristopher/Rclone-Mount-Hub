@@ -74,6 +74,8 @@ pub fn run() {
             commands::get_rclone_config_path,
             commands::get_default_rclone_config_path,
             // App update commands
+            commands::write_text_file,
+            commands::read_text_file,
             commands::get_app_version,
             commands::check_app_update,
             commands::apply_app_update,
