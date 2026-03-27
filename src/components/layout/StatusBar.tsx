@@ -1,6 +1,8 @@
 import { clsx } from "clsx";
 import { CaretUp, CaretDown, Terminal } from "phosphor-react";
 import { useLogStore } from "../../lib/logStore";
+import { getVersion } from "@tauri-apps/api/app";
+import { useState, useEffect } from "react";
 
 interface StatusBarProps {
   mountedCount: number;
@@ -12,6 +14,8 @@ export function StatusBar({ mountedCount, networkStatus }: StatusBarProps) {
   const filteredLogs = filter === "all"
     ? logs
     : logs.filter(log => log.category === filter);
+  const [appVersion, setAppVersion] = useState("");
+  useEffect(() => { getVersion().then(setAppVersion).catch(() => {}); }, []);
 
   return (
     <div className="h-[26px] px-3 bg-bg-base/80 backdrop-blur-md border-t border-white/[0.06] flex items-center justify-between text-[11px] text-text-tertiary select-none">
@@ -62,7 +66,7 @@ export function StatusBar({ mountedCount, networkStatus }: StatusBarProps) {
         </button>
 
         <div className="w-px h-3 bg-white/[0.08]" />
-        <span className="opacity-50">v0.1.0</span>
+        {appVersion && <span className="opacity-50">v{appVersion}</span>}
       </div>
     </div>
   );
