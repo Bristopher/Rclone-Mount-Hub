@@ -68,6 +68,20 @@ if ($LASTEXITCODE -ne 0) { throw "pnpm tauri build failed" }
 # ── Step 2: Velopack pack ─────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 2 — Packaging with Velopack..." -ForegroundColor Yellow
+
+$outDir = Join-Path $ProjectRoot "src-tauri\Releases\v$version"
+if (Test-Path $outDir) {
+    Write-Host ""
+    Write-Host "  WARNING: Release v$version already exists at:" -ForegroundColor Yellow
+    Write-Host "  $outDir" -ForegroundColor White
+    $overwrite = Read-Host "  Overwrite? [y/N]"
+    if ($overwrite.Trim().ToLower() -ne "y") {
+        throw "Aborted — release v$version already exists."
+    }
+    Remove-Item $outDir -Recurse -Force
+    Write-Host "  Deleted existing release folder." -ForegroundColor DarkGray
+}
+
 Set-Location (Join-Path $ProjectRoot "src-tauri")
 vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion $version --packDir "target/release" --mainExe "rclone-mount-hub.exe" --outputDir "Releases/v$version"
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
