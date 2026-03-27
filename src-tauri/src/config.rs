@@ -24,6 +24,10 @@ pub struct Connection {
     pub created_at: String, // ISO timestamp
     #[serde(default)]
     pub cache_overrides: Option<CacheOverrides>,
+    #[serde(default)]
+    pub dual_mount: bool,
+    #[serde(default)]
+    pub archive_drive_letter: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,6 +118,7 @@ pub struct MountStatus {
     pub active_mode: Option<String>, // "local" or "tailscale"
     pub active_url: Option<String>,
     pub pid: Option<u32>,
+    pub archive_pid: Option<u32>,
     pub error: Option<String>,
     pub log: Option<String>,
 }

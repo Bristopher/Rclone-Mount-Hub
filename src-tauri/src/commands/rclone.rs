@@ -425,6 +425,7 @@ pub async fn mount_drive(
                 active_mode: Some(active_mode),
                 active_url: Some(url),
                 pid: Some(pid),
+                archive_pid: None,
                 error: Some(format!(
                     "Drive {}:\\ not visible in Explorer. rclone running (PID {}). Possible causes: WinFsp issue, drive letter conflict, or auth failure.",
                     connection.drive_letter.to_uppercase(), pid
@@ -434,7 +435,7 @@ pub async fn mount_drive(
         }
     }
 
-    // Store mount info
+    // Store main mount info
     insert_mount(connection.id.clone(), MountInfo {
         _connection_id: connection.id.clone(),
         pid,
@@ -443,12 +444,76 @@ pub async fn mount_drive(
         active_url: url.clone(),
     });
 
+    // Spawn archive mount if dual_mount is enabled
+    let mut archive_pid: Option<u32> = None;
+    if connection.dual_mount {
+        if let Some(ref archive_letter) = connection.archive_drive_letter {
+            if !archive_letter.is_empty() {
+                // Check archive drive letter is not already in use
+                #[cfg(target_os = "windows")]
+                let letter_free = !std::path::Path::new(&format!("{}:\\", archive_letter.to_uppercase())).exists();
+                #[cfg(not(target_os = "windows"))]
+                let letter_free = true;
+
+                if letter_free {
+                    let archive_drive = format!("{}:", archive_letter);
+                    let archive_remote = format!("{}:", connection.name);
+                    let mut archive_args = config_args();
+                    archive_args.extend([
+                        "mount".to_string(),
+                        archive_remote,
+                        archive_drive,
+                        "--webdav-url".to_string(),
+                        url.clone(),
+                        "--vfs-cache-mode".to_string(),
+                        "full".to_string(),
+                        "--vfs-cache-max-size".to_string(),
+                        "100G".to_string(),
+                        "--vfs-read-ahead".to_string(),
+                        "1G".to_string(),
+                        "--buffer-size".to_string(),
+                        "512M".to_string(),
+                        "--transfers".to_string(),
+                        "8".to_string(),
+                        "--multi-thread-streams".to_string(),
+                        "8".to_string(),
+                        "--dir-cache-time".to_string(),
+                        "24h".to_string(),
+                        "--poll-interval".to_string(),
+                        "1h".to_string(),
+                        "--ignore-checksum".to_string(),
+                        "--no-modtime".to_string(),
+                        "--read-only".to_string(),
+                        "--network-mode=false".to_string(),
+                        format!("--volname={} (Archive)", connection.name),
+                    ]);
+
+                    if let Ok((_rx, archive_child)) = app.shell().command("rclone").args(&archive_args).spawn() {
+                        let apid = archive_child.pid();
+                        std::thread::sleep(std::time::Duration::from_millis(600));
+                        if is_process_alive(apid) {
+                            insert_mount(format!("{}-archive", connection.id), MountInfo {
+                                _connection_id: connection.id.clone(),
+                                pid: apid,
+                                _drive_letter: archive_letter.clone(),
+                                active_mode: active_mode.clone(),
+                                active_url: url.clone(),
+                            });
+                            archive_pid = Some(apid);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     Ok(MountStatus {
         connection_id: connection.id,
         state: MountState::Mounted,
         active_mode: Some(active_mode),
         active_url: Some(url),
         pid: Some(pid),
+        archive_pid,
         error: None,
         log: Some(mount_log),
     })
@@ -463,7 +528,6 @@ pub async fn unmount_drive(connection_id: String) -> Result<(), String> {
 
         #[cfg(target_os = "windows")]
         {
-            // Kill the rclone process by PID
             crate::util::cmd("taskkill")
                 .args(["/F", "/PID", &pid.to_string()])
                 .output()
@@ -479,8 +543,25 @@ pub async fn unmount_drive(connection_id: String) -> Result<(), String> {
                 .map_err(|e| format!("Failed to kill process: {}", e))?;
         }
 
-        // Remove from tracking
         remove_mount(&connection_id);
+
+        // Also kill archive mount if present
+        let archive_key = format!("{}-archive", connection_id);
+        if let Some(archive_info) = mounts.get(&archive_key) {
+            let apid = archive_info.pid;
+            #[cfg(target_os = "windows")]
+            {
+                let _ = crate::util::cmd("taskkill")
+                    .args(["/F", "/PID", &apid.to_string()])
+                    .output();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                use std::process::Command;
+                let _ = Command::new("kill").args(["-9", &apid.to_string()]).output();
+            }
+            remove_mount(&archive_key);
+        }
 
         Ok(())
     } else {
@@ -492,8 +573,13 @@ pub async fn unmount_drive(connection_id: String) -> Result<(), String> {
 pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, String> {
     let mounts = get_mounts_map();
 
+    // Look up archive PID (may or may not exist)
+    let archive_key = format!("{}-archive", connection_id);
+    let archive_pid = mounts.get(&archive_key).and_then(|info| {
+        if is_process_alive(info.pid) { Some(info.pid) } else { None }
+    });
+
     if let Some(mount_info) = mounts.get(&connection_id) {
-        // Check if process is still alive
         let is_alive = is_process_alive(mount_info.pid);
 
         if is_alive {
@@ -503,11 +589,11 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
                 active_mode: Some(mount_info.active_mode.clone()),
                 active_url: Some(mount_info.active_url.clone()),
                 pid: Some(mount_info.pid),
+                archive_pid,
                 error: None,
                 log: None,
             })
         } else {
-            // Process died, remove from tracking
             remove_mount(&connection_id);
             Ok(MountStatus {
                 connection_id: connection_id.clone(),
@@ -515,6 +601,7 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
                 active_mode: None,
                 active_url: None,
                 pid: None,
+                archive_pid: None,
                 error: Some("Process terminated unexpectedly".to_string()),
                 log: None,
             })
@@ -526,6 +613,7 @@ pub async fn get_mount_status(connection_id: String) -> Result<MountStatus, Stri
             active_mode: None,
             active_url: None,
             pid: None,
+            archive_pid: None,
             error: None,
             log: None,
         })
@@ -538,15 +626,26 @@ pub async fn get_all_mount_statuses() -> Result<Vec<MountStatus>, String> {
     let mut statuses = Vec::new();
 
     for (connection_id, mount_info) in mounts.iter() {
-        let is_alive = is_process_alive(mount_info.pid);
+        // Skip archive entries — they're rolled up into the primary connection status
+        if connection_id.ends_with("-archive") {
+            continue;
+        }
 
+        let is_alive = is_process_alive(mount_info.pid);
         if is_alive {
+            // Look up archive PID for this connection
+            let archive_key = format!("{}-archive", connection_id);
+            let archive_pid = mounts.get(&archive_key).and_then(|info| {
+                if is_process_alive(info.pid) { Some(info.pid) } else { None }
+            });
+
             statuses.push(MountStatus {
                 connection_id: connection_id.clone(),
                 state: MountState::Mounted,
                 active_mode: Some(mount_info.active_mode.clone()),
                 active_url: Some(mount_info.active_url.clone()),
                 pid: Some(mount_info.pid),
+                archive_pid,
                 error: None,
                 log: None,
             });

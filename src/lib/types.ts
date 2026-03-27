@@ -17,6 +17,8 @@ export interface Connection {
   sort_order: number;
   created_at: string;
   cache_overrides?: CacheOverrides;
+  dual_mount: boolean;
+  archive_drive_letter?: string;
 }
 
 export type NetworkMode = "auto" | "local" | "tailscale";
@@ -29,6 +31,7 @@ export interface MountStatus {
   active_mode: "local" | "tailscale" | null;
   active_url: string | null;
   pid: number | null;
+  archive_pid: number | null;
   error: string | null;
   log: string | null;
 }

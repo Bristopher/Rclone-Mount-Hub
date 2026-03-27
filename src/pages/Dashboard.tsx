@@ -613,7 +613,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         </div>
                       )}
                       <div className="text-[13px] text-text-secondary">
-                        {conn.remote_type?.toUpperCase() || "WEBDAV"} &bull; Drive {conn.drive_letter}: &bull;{" "}
+                        {conn.remote_type?.toUpperCase() || "WEBDAV"} &bull; Drive {conn.drive_letter}:{conn.dual_mount && conn.archive_drive_letter ? ` + ${conn.archive_drive_letter}: (Archive)` : ""} &bull;{" "}
                         {isMounted && status?.active_url
                           ? status.active_url.replace("http://", "")
                           : `${conn.local_ip}:${conn.port}`} &bull;{" "}

@@ -59,6 +59,8 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
   const [networkMode, setNetworkMode] = useState(connection.network_mode);
   const [speedProfile, setSpeedProfile] = useState(connection.speed_profile);
   const [autoMount, setAutoMount] = useState(connection.auto_mount);
+  const [dualMount, setDualMount] = useState(connection.dual_mount ?? false);
+  const [archiveDriveLetter, setArchiveDriveLetter] = useState(connection.archive_drive_letter || "");
   const [webdavVendor, setWebdavVendor] = useState("copyparty");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [cacheOverrides, setCacheOverrides] = useState<Partial<CacheOverrides>>(
@@ -82,6 +84,17 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
       setDriveLetter(dir === 1 ? availableLetters[0] : availableLetters[availableLetters.length - 1]);
     } else {
       setDriveLetter(availableLetters[(idx + dir + availableLetters.length) % availableLetters.length]);
+    }
+  };
+
+  const navigateArchiveLetter = (dir: 1 | -1) => {
+    const free = availableLetters.filter(l => l !== driveLetter);
+    if (free.length === 0) return;
+    const idx = free.indexOf(archiveDriveLetter);
+    if (idx === -1) {
+      setArchiveDriveLetter(dir === 1 ? free[0] : free[free.length - 1]);
+    } else {
+      setArchiveDriveLetter(free[(idx + dir + free.length) % free.length]);
     }
   };
 
@@ -219,6 +232,8 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
         speed_profile: speedProfile,
         auto_mount: autoMount,
         cache_overrides: Object.values(cacheOverrides).some(v => v !== undefined) ? cacheOverrides as CacheOverrides : undefined,
+        dual_mount: dualMount,
+        archive_drive_letter: dualMount && archiveDriveLetter ? archiveDriveLetter : undefined,
       };
 
       update(connection.id, updates);
@@ -595,6 +610,81 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
                 }`}
               />
             </button>
+          </Card>
+
+          {/* Dual Mount */}
+          <Card className="p-5">
+            <div className="flex items-center justify-between mb-0">
+              <div>
+                <div className="text-[13px] font-medium text-text-primary mb-0.5">
+                  Dual Mount (Archive)
+                </div>
+                <div className="text-[11px] text-text-tertiary">
+                  Mount a second read-only drive with 24h cached listings — fast browsing for grabbing old files
+                </div>
+              </div>
+              <button
+                onClick={() => setDualMount(!dualMount)}
+                className={`relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 ml-4 ${
+                  dualMount ? "bg-accent-purple shadow-[0_0_8px_rgba(139,92,246,0.3)]" : "bg-white/[0.15]"
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-200 ${
+                    dualMount ? "left-[22px]" : "left-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+
+            {dualMount && (
+              <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                <div className="grid grid-cols-2 gap-4 items-start">
+                  <div>
+                    <div className="text-[11px] font-medium text-text-secondary mb-2 uppercase tracking-wide">Live Mount</div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-9 flex items-center justify-center rounded-lg bg-accent-blue/10 border border-accent-blue/20 text-[15px] font-semibold text-accent-blue">
+                        {driveLetter}
+                      </div>
+                      <div className="text-[11px] text-text-tertiary leading-tight">
+                        Always up-to-date<br />normal speed profile
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-medium text-text-secondary mb-2 uppercase tracking-wide">Archive Mount</div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigateArchiveLetter(-1)}
+                        className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors"
+                      >
+                        <CaretLeft size={13} weight="bold" />
+                      </button>
+                      <input
+                        maxLength={1}
+                        value={archiveDriveLetter}
+                        onChange={(e) => setArchiveDriveLetter(e.target.value.toUpperCase())}
+                        className="w-12 h-9 text-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-[15px] font-semibold text-accent-purple focus:outline-none focus:border-accent-purple/50 uppercase"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => navigateArchiveLetter(1)}
+                        className="w-8 h-9 flex items-center justify-center rounded-lg bg-white/[0.04] border border-white/[0.08] text-text-tertiary hover:text-text-primary hover:bg-white/[0.08] transition-colors"
+                      >
+                        <CaretRight size={13} weight="bold" />
+                      </button>
+                      <div className="text-[11px] text-text-tertiary leading-tight">
+                        Read-only, 24h<br />dir cache
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[11px] text-text-tertiary mt-3">
+                  The archive mount has aggressive directory caching (24h) and polls for changes only hourly. Use it to browse and grab files — uploads and edits should use the live mount.
+                </p>
+              </div>
+            )}
           </Card>
 
           {/* Actions */}
