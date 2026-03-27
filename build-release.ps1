@@ -72,25 +72,31 @@ Set-Location (Join-Path $ProjectRoot "src-tauri")
 vpk pack --packId com.cbuzi.rclone-mount-hub --packTitle "Rclone Mount Hub" --packVersion $version --packDir "target/release" --mainExe "rclone-mount-hub.exe" --outputDir "Releases/v$version"
 if ($LASTEXITCODE -ne 0) { throw "vpk pack failed" }
 
-# ── Step 3: Rename distributable files ───────────────────────────────────────
+# ── Step 3: Rename setup installer ───────────────────────────────────────────
 Write-Host ""
 Write-Host "Step 3 — Renaming release files..." -ForegroundColor Yellow
 $outDir = Join-Path $ProjectRoot "src-tauri\Releases\v$version"
 
-@{
-    "com.cbuzi.rclone-mount-hub-win-Setup.exe"    = "Rclone Mount Hub_${version}_x64-setup.exe"
-    "com.cbuzi.rclone-mount-hub-win-Portable.zip" = "Rclone Mount Hub_${version}_x64-portable.zip"
-}.GetEnumerator() | ForEach-Object {
-    $src = Join-Path $outDir $_.Key
-    $dst = Join-Path $outDir $_.Value
-    if (Test-Path $src) {
-        Rename-Item $src $dst
-        Write-Host "  $($_.Key) -> $($_.Value)" -ForegroundColor Green
-    }
+$setupSrc = Join-Path $outDir "com.cbuzi.rclone-mount-hub-win-Setup.exe"
+$setupDst = Join-Path $outDir "Rclone Mount Hub_${version}_x64-setup.exe"
+if (Test-Path $setupSrc) {
+    Rename-Item $setupSrc $setupDst
+    Write-Host "  Setup   -> Rclone Mount Hub_${version}_x64-setup.exe" -ForegroundColor Green
+}
+
+# ── Step 4: Copy portable exe into the same releases folder ───────────────────
+Write-Host ""
+Write-Host "Step 4 — Copying portable exe..." -ForegroundColor Yellow
+$portableSrc = Join-Path $ProjectRoot "src-tauri\target\release\rclone-mount-hub.exe"
+$portableDst = Join-Path $outDir "Rclone Mount Hub_${version}_x64-Portable.exe"
+if (Test-Path $portableSrc) {
+    Copy-Item $portableSrc $portableDst
+    Write-Host "  Portable -> Rclone Mount Hub_${version}_x64-Portable.exe" -ForegroundColor Green
 }
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Done! Release v$version ready at:" -ForegroundColor Green
-Write-Host "  src-tauri\Releases\v$version\" -ForegroundColor Green
+Write-Host "  src-tauri\Releases\v$version\Rclone Mount Hub_${version}_x64-setup.exe" -ForegroundColor White
+Write-Host "  src-tauri\Releases\v$version\Rclone Mount Hub_${version}_x64-Portable.exe" -ForegroundColor White
 Set-Location $ProjectRoot
