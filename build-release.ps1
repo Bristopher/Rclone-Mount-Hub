@@ -44,6 +44,13 @@ $cargo = $cargo -replace '(?m)^version = "\d+\.\d+\.\d+"', "version = `"$version
 Set-Content $cargoToml $cargo -Encoding UTF8 -NoNewline
 Write-Host "  Updated Cargo.toml -> $version"
 
+# ── Update package.json ───────────────────────────────────────────────────────
+$packageJson = Join-Path $ProjectRoot "package.json"
+$pkg = Get-Content $packageJson -Raw
+$pkg = $pkg -replace '"version":\s*"\d+\.\d+\.\d+"', "`"version`": `"$version`""
+Set-Content $packageJson $pkg -Encoding UTF8 -NoNewline
+Write-Host "  Updated package.json -> $version"
+
 # ── Update README.md version badge ───────────────────────────────────────────
 $readme = Join-Path $ProjectRoot "README.md"
 $readmeContent = Get-Content $readme -Raw
