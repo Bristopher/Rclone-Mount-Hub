@@ -132,29 +132,94 @@ pub async fn test_connection(
     })
 }
 
+// HANDLE is *mut c_void which is !Send, but we only use it from the monitor thread
+// after storing it. Safety: we never dereference concurrently without synchronization.
+#[cfg(target_os = "windows")]
+struct SendHandle(windows::Win32::Foundation::HANDLE);
+#[cfg(target_os = "windows")]
+unsafe impl Send for SendHandle {}
+#[cfg(target_os = "windows")]
+unsafe impl Sync for SendHandle {}
+
+#[cfg(target_os = "windows")]
+static CANCEL_EVENT: std::sync::OnceLock<SendHandle> = std::sync::OnceLock::new();
+
+/// Signal the network monitor thread to exit cleanly.
+/// Call this before process exit so the blocked thread can wake and return.
+#[cfg(target_os = "windows")]
+pub fn stop_network_monitor() {
+    if let Some(ev) = CANCEL_EVENT.get() {
+        unsafe {
+            let _ = windows::Win32::System::Threading::SetEvent(ev.0);
+        }
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn stop_network_monitor() {}
+
 #[cfg(target_os = "windows")]
 pub fn start_network_monitor(app: tauri::AppHandle) {
+    use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0};
+    use windows::Win32::NetworkManagement::IpHelper::{CancelIPChangeNotify, NotifyAddrChange};
+    use windows::Win32::System::IO::OVERLAPPED;
+    use windows::Win32::System::Threading::{CreateEventW, WaitForMultipleObjects, INFINITE};
+
+    // Manual-reset event used to signal the thread to stop
+    let cancel_event = unsafe {
+        CreateEventW(None, true, false, None)
+            .expect("Failed to create cancel event for network monitor")
+    };
+    // Store in the global BEFORE spawning the thread so the thread can retrieve it
+    CANCEL_EVENT.set(SendHandle(cancel_event)).ok();
+
     std::thread::spawn(move || {
+        // Retrieve the cancel handle from the global — avoids moving !Send HANDLE across thread boundary
+        let cancel_event = CANCEL_EVENT.get().unwrap().0;
+
         loop {
-            // NotifyAddrChange with synchronous blocking — zero CPU while waiting
+            // Auto-reset event that NotifyAddrChange will signal on network change
+            let notify_event = unsafe {
+                CreateEventW(None, false, false, None)
+                    .expect("Failed to create notify event")
+            };
+
+            let mut notify_handle = HANDLE::default();
+            let mut overlapped = OVERLAPPED::default();
+            overlapped.hEvent = notify_event;
+
             unsafe {
-                let mut handle = windows::Win32::Foundation::HANDLE::default();
-                let result = windows::Win32::NetworkManagement::IpHelper::NotifyAddrChange(
-                    &mut handle,
-                    std::ptr::null(),
-                );
-                if result != 0 {
-                    // If the API fails, fall back to polling every 30s
-                    std::thread::sleep(std::time::Duration::from_secs(30));
-                    app.emit("network-changed", ()).ok();
-                    continue;
+                // Overlapped (async) form — returns immediately with ERROR_IO_PENDING
+                let _ = NotifyAddrChange(&mut notify_handle, &overlapped as *const OVERLAPPED);
+
+                // Wait for either a network change or the cancel signal
+                let handles = [notify_event, cancel_event];
+                let result = WaitForMultipleObjects(&handles, false, INFINITE);
+
+                let _ = CloseHandle(notify_event);
+
+                // index 0 (WAIT_OBJECT_0) = notify fired, index 1 = cancel fired
+                if result.0 == WAIT_OBJECT_0.0 + 1 {
+                    let _ = CancelIPChangeNotify(&overlapped);
+                    return;
                 }
             }
 
-            // Debounce — network changes often fire multiple rapid events
-            std::thread::sleep(std::time::Duration::from_secs(2));
+            // Debounce: network events often fire in rapid bursts.
+            // Sleep in short chunks so we can still respond to cancel quickly.
+            for _ in 0..20 {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                unsafe {
+                    let r = windows::Win32::System::Threading::WaitForSingleObject(
+                        cancel_event,
+                        0,
+                    );
+                    if r == WAIT_OBJECT_0 {
+                        return;
+                    }
+                }
+            }
 
-            // Emit event to frontend
             app.emit("network-changed", ()).ok();
         }
     });

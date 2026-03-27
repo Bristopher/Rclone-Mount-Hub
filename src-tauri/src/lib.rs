@@ -137,6 +137,17 @@ pub fn run() {
             // Start background network change monitor
             commands::network::start_network_monitor(app.handle().clone());
 
+            // Hide to tray instead of destroying window on close
+            if let Some(window) = app.get_webview_window("main") {
+                let win = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win.hide();
+                    }
+                });
+            }
+
             Ok(())
         });
 
@@ -144,6 +155,13 @@ pub fn run() {
     let builder = builder.plugin(tauri_plugin_mcp_bridge::init());
 
     builder
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while running tauri application")
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Signal the network monitor thread to wake and exit cleanly
+                // before the process terminates, avoiding kernel handle leaks.
+                commands::network::stop_network_monitor();
+            }
+        });
 }
