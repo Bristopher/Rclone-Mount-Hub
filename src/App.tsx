@@ -7,7 +7,6 @@ import { EditConnection } from "./pages/EditConnection";
 import { Settings } from "./pages/Settings";
 import { Export } from "./pages/Export";
 import { SpeedTest } from "./pages/SpeedTest";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, useConnectionStore } from "./lib/store";
@@ -16,6 +15,7 @@ import type { Connection } from "./lib/types";
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
+  const [quitting, setQuitting] = useState(false);
   const { settings } = useSettingsStore();
   const { connections } = useConnectionStore();
 
@@ -36,32 +36,21 @@ function App() {
     invoke("set_rclone_config_path", { path: settings.rclone_config_path }).catch(console.error);
   }, [settings.rclone_config_path]);
 
-  // Handle close to tray
+  // Ctrl+close from Rust: show quit animation then exit
   useEffect(() => {
-    const appWindow = getCurrentWindow();
-
-    const unlisten = appWindow.onCloseRequested(async (event) => {
-      if (settings.close_to_tray) {
-        // Prevent default close and hide instead
-        event.preventDefault();
-        await invoke("hide_window");
-      }
+    const unlisten = listen("quit-requested", () => {
+      setQuitting(true);
+      setTimeout(() => invoke("full_quit"), 700);
     });
-
-    return () => {
-      unlisten.then(fn => fn());
-    };
-  }, [settings.close_to_tray]);
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
 
   // Listen for network change events from Rust backend
   useEffect(() => {
     const unlisten = listen("network-changed", () => {
       window.dispatchEvent(new CustomEvent("network-changed"));
     });
-
-    return () => {
-      unlisten.then(fn => fn());
-    };
+    return () => { unlisten.then(fn => fn()); };
   }, []);
 
   const renderPage = () => {
@@ -91,6 +80,59 @@ function App() {
         {renderPage()}
       </AppLayout>
       <Toaster position="bottom-right" theme="dark" />
+
+      {/* Ctrl+Close full-quit overlay */}
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 9999,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          opacity: quitting ? 1 : 0,
+          pointerEvents: quitting ? "all" : "none",
+          transition: "opacity 0.2s ease",
+        }}
+      >
+        <div
+          style={{
+            background: "rgba(20,20,28,0.95)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "16px",
+            padding: "32px 48px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "16px",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+            transform: quitting ? "scale(1)" : "scale(0.85)",
+            transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+          }}
+        >
+          {/* Spinning ring */}
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              border: "3px solid rgba(255,255,255,0.1)",
+              borderTopColor: "#6366f1",
+              animation: quitting ? "spin 0.7s linear infinite" : "none",
+            }}
+          />
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ color: "#fff", fontSize: "15px", fontWeight: 600, letterSpacing: "0.01em" }}>
+            Quitting Rclone Mount Hub
+          </div>
+          <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px" }}>
+            Ctrl + Close
+          </div>
+        </div>
+      </div>
     </>
   );
 }

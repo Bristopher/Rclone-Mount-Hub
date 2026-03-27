@@ -21,6 +21,11 @@ pub async fn hide_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[command]
+pub async fn full_quit(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 /// Rebuilds the system tray right-click menu with an "Open X:" item for each active mount.
 /// mount_entries: list of (display_name, drive_letter) for each mounted drive.
 #[command]

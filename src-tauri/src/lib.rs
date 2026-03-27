@@ -2,7 +2,7 @@ mod commands;
 mod config;
 mod util;
 
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tauri::{menu::*, tray::*};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -66,6 +66,7 @@ pub fn run() {
             // Window commands
             commands::show_window,
             commands::hide_window,
+            commands::full_quit,
             commands::send_notification,
             commands::update_tray_menu,
             // Rclone config path
@@ -137,12 +138,25 @@ pub fn run() {
             // Start background network change monitor
             commands::network::start_network_monitor(app.handle().clone());
 
-            // Hide to tray instead of destroying window on close
+            // Hide to tray on close; Ctrl+close triggers full-quit animation
             if let Some(window) = app.get_webview_window("main") {
                 let win = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
+                        #[cfg(target_os = "windows")]
+                        {
+                            use windows::Win32::UI::Input::KeyboardAndMouse::{
+                                GetAsyncKeyState, VK_CONTROL,
+                            };
+                            // High bit set = key is currently down
+                            let ctrl_held = unsafe { GetAsyncKeyState(VK_CONTROL.0 as i32) } < 0;
+                            if ctrl_held {
+                                // Signal frontend to show quit animation, then exit
+                                let _ = win.emit("quit-requested", ());
+                                return;
+                            }
+                        }
                         let _ = win.hide();
                     }
                 });
