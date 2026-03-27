@@ -21,6 +21,7 @@ import { useConnectionStore, useMountSummaryStore, useSettingsStore } from "../l
 import { useLogStore } from "../lib/logStore";
 import type { Connection, MountStatus } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
+import { confirm } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
 
 interface DashboardProps {
@@ -419,9 +420,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   };
 
   const handleDelete = async (conn: Connection) => {
-    if (!confirm(`Delete connection "${conn.name}"? This cannot be undone.`)) {
-      return;
-    }
+    const confirmed = await confirm(`Delete connection "${conn.name}"? This cannot be undone.`, {
+      title: "Delete Connection",
+      kind: "warning",
+    });
+    if (!confirmed) return;
 
     const status = mountStatuses[conn.id];
     if (status?.state === "mounted") {
@@ -443,9 +446,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   };
 
   const handleDeleteRemote = async (remoteName: string) => {
-    if (!confirm(`Delete rclone remote "${remoteName}"? This will remove it from rclone config.`)) {
-      return;
-    }
+    const confirmed = await confirm(`Delete rclone remote "${remoteName}"? This will remove it from rclone config.`, {
+      title: "Delete Remote",
+      kind: "warning",
+    });
+    if (!confirmed) return;
 
     try {
       await invoke("delete_remote", { name: remoteName });

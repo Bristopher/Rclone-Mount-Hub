@@ -1,6 +1,27 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { PersistStorage, StorageValue } from "zustand/middleware";
+import { LazyStore } from "@tauri-apps/plugin-store";
 import type { AppSettings, Connection } from "./types";
+
+// Tauri plugin-store backed storage — survives Velopack updates
+// (localStorage lives in WebView2 profile which can be wiped on reinstall)
+const tauriFileStore = new LazyStore("connections.json");
+
+const tauriStorage: PersistStorage<ConnectionStore> = {
+  getItem: async (name): Promise<StorageValue<ConnectionStore> | null> => {
+    const value = await tauriFileStore.get<StorageValue<ConnectionStore>>(name);
+    return value ?? null;
+  },
+  setItem: async (name, value) => {
+    await tauriFileStore.set(name, value);
+    await tauriFileStore.save();
+  },
+  removeItem: async (name) => {
+    await tauriFileStore.delete(name);
+    await tauriFileStore.save();
+  },
+};
 
 // Mount status summary store (written by Dashboard, read by StatusBar)
 interface MountSummaryStore {
@@ -82,6 +103,7 @@ export const useConnectionStore = create<ConnectionStore>()(
     }),
     {
       name: "rclone-mounter-connections",
+      storage: tauriStorage,
     }
   )
 );
