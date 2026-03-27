@@ -71,8 +71,8 @@ Write-Host "Step 3 — Renaming release files..." -ForegroundColor Yellow
 $outDir = Join-Path $ProjectRoot "src-tauri\Releases\v$version"
 
 @{
-    "com.cbuzi.rclone-mount-hub-win-Setup.exe"    = "Rclone Mount Hub-Setup_v$version.exe"
-    "com.cbuzi.rclone-mount-hub-win-Portable.zip" = "Rclone Mount Hub-Portable_v$version.zip"
+    "com.cbuzi.rclone-mount-hub-win-Setup.exe"    = "Rclone Mount Hub_${version}_x64-setup.exe"
+    "com.cbuzi.rclone-mount-hub-win-Portable.zip" = "Rclone Mount Hub_${version}_x64-portable.zip"
 }.GetEnumerator() | ForEach-Object {
     $src = Join-Path $outDir $_.Key
     $dst = Join-Path $outDir $_.Value
