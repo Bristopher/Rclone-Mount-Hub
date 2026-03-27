@@ -67,8 +67,10 @@ impl SpeedProfile {
                 buffer_size: "512M".to_string(),
                 transfers: 16,
                 multi_thread_streams: 16,
-                dir_cache_time: "0".to_string(),
-                poll_interval: "5m".to_string(),
+                // Cache dir listings for 1h; poll every 30s detects real changes
+                // and invalidates stale dirs immediately — fast browsing + fresh data
+                dir_cache_time: "1h".to_string(),
+                poll_interval: "30s".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
@@ -80,8 +82,9 @@ impl SpeedProfile {
                 buffer_size: "256M".to_string(),
                 transfers: 8,
                 multi_thread_streams: 8,
-                dir_cache_time: "0".to_string(),
-                poll_interval: "5m".to_string(),
+                // Cache dir listings for 5m; poll every minute keeps it current
+                dir_cache_time: "5m".to_string(),
+                poll_interval: "1m".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
@@ -93,8 +96,9 @@ impl SpeedProfile {
                 buffer_size: "64M".to_string(),
                 transfers: 4,
                 multi_thread_streams: 4,
-                dir_cache_time: "30s".to_string(),
-                poll_interval: "10m".to_string(),
+                // 2m dir cache; poll every 5m — conserves bandwidth
+                dir_cache_time: "2m".to_string(),
+                poll_interval: "5m".to_string(),
                 ignore_checksum: true,
                 no_modtime: false,
                 network_mode: false,
