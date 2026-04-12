@@ -66,7 +66,10 @@ impl SpeedProfile {
         match self {
             SpeedProfile::Max => SpeedProfileConfig {
                 vfs_cache_mode: "full".to_string(),
-                vfs_cache_max_size: "50G".to_string(),
+                // 500G cap so VM images and other huge files don't deadlock the
+                // VFS cache. Paired with --vfs-cache-min-free-space in rclone.rs
+                // so the cache can't actually fill the user's OS drive.
+                vfs_cache_max_size: "500G".to_string(),
                 vfs_read_ahead: "512M".to_string(),
                 buffer_size: "512M".to_string(),
                 transfers: 16,
@@ -81,7 +84,9 @@ impl SpeedProfile {
             },
             SpeedProfile::Balanced => SpeedProfileConfig {
                 vfs_cache_mode: "full".to_string(),
-                vfs_cache_max_size: "10G".to_string(),
+                // 200G cap — generous enough for VM backups and large media
+                // files without silently deadlocking on files bigger than cache.
+                vfs_cache_max_size: "200G".to_string(),
                 vfs_read_ahead: "128M".to_string(),
                 buffer_size: "256M".to_string(),
                 transfers: 8,
@@ -95,7 +100,9 @@ impl SpeedProfile {
             },
             SpeedProfile::Low => SpeedProfileConfig {
                 vfs_cache_mode: "full".to_string(),
-                vfs_cache_max_size: "2G".to_string(),
+                // 50G cap — low-resource profile, but still large enough to
+                // handle typical large files without deadlocking.
+                vfs_cache_max_size: "50G".to_string(),
                 vfs_read_ahead: "32M".to_string(),
                 buffer_size: "64M".to_string(),
                 transfers: 4,

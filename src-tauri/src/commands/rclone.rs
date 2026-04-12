@@ -340,6 +340,10 @@ pub async fn mount_drive(
         vfs_cache_mode,
         "--vfs-cache-max-size".to_string(),
         vfs_cache_max_size,
+        // Reserve 10G free on the cache drive so a large write can't fill
+        // the OS drive. rclone will evict or block before hitting this floor.
+        "--vfs-cache-min-free-space".to_string(),
+        "10G".to_string(),
         "--vfs-read-ahead".to_string(),
         vfs_read_ahead,
         "--buffer-size".to_string(),
@@ -468,7 +472,9 @@ pub async fn mount_drive(
                         "--vfs-cache-mode".to_string(),
                         "full".to_string(),
                         "--vfs-cache-max-size".to_string(),
-                        "100G".to_string(),
+                        "500G".to_string(),
+                        "--vfs-cache-min-free-space".to_string(),
+                        "10G".to_string(),
                         "--vfs-read-ahead".to_string(),
                         "1G".to_string(),
                         "--buffer-size".to_string(),

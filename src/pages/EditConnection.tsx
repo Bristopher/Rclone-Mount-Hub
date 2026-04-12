@@ -452,9 +452,9 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
             </h2>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { value: "max", label: "Max Speed", cache: "50 GB", desc: "10Gbps LAN, Fiber" },
-                { value: "balanced", label: "Balanced", cache: "10 GB", desc: "Daily use (Recommended)" },
-                { value: "low", label: "Low Resource", cache: "2 GB", desc: "Battery, slow WiFi" },
+                { value: "max", label: "Max Speed", cache: "500 GB", desc: "10Gbps LAN, Fiber" },
+                { value: "balanced", label: "Balanced", cache: "200 GB", desc: "Daily use (Recommended)" },
+                { value: "low", label: "Low Resource", cache: "50 GB", desc: "Battery, slow WiFi" },
               ].map((profile) => (
                 <button
                   key={profile.value}
@@ -541,7 +541,7 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
                   </div>
                   <Input
                     label="VFS Cache Size"
-                    placeholder={speedProfile === "max" ? "50G" : speedProfile === "balanced" ? "10G" : "2G"}
+                    placeholder={speedProfile === "max" ? "500G" : speedProfile === "balanced" ? "200G" : "50G"}
                     value={cacheOverrides.vfs_cache_max_size || ""}
                     onChange={(e) => setCacheOverrides({ ...cacheOverrides, vfs_cache_max_size: e.target.value || undefined })}
                   />
