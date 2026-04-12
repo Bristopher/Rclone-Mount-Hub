@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   show_notifications: true,
   rclone_config_path: "",
   network_change_mode: "notify",
+  cache_dir: "",
 };
 
 // Settings Store

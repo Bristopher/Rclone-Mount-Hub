@@ -10,6 +10,7 @@ import {
   Warning,
   Trash,
   CloudArrowDown,
+  CloudArrowUp,
   DesktopTower,
   PencilSimple,
 } from "phosphor-react";
@@ -23,6 +24,7 @@ import type { Connection, MountStatus } from "../lib/types";
 import { invoke } from "@tauri-apps/api/core";
 import { confirm } from "@tauri-apps/plugin-dialog";
 import { toast } from "sonner";
+import { DirectUploadModal } from "../components/DirectUploadModal";
 
 interface DashboardProps {
   onNavigate?: (page: string, connectionId?: string) => void;
@@ -60,6 +62,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [initialLoading, setInitialLoading] = useState(true);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [timeSince, setTimeSince] = useState<string>("");
+  const [showUpload, setShowUpload] = useState(false);
   const didAutoMount = useRef(false);
 
   // Keep the "X seconds/minutes ago" label ticking every 5 s
@@ -162,6 +165,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             await invoke("unmount_drive", { connectionId: conn.id });
             const newStatus = await invoke<MountStatus>("mount_drive", {
               connectionJson: JSON.stringify(conn),
+              cacheDir: settings.cache_dir || null,
             });
             setMountStatuses(prev => ({ ...prev, [conn.id]: newStatus }));
             addLog("success", `${conn.name} reconnected via ${newMode}`, "network");
@@ -269,6 +273,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     try {
       const status = await invoke<MountStatus>("mount_drive", {
         connectionJson: JSON.stringify(conn),
+        cacheDir: settings.cache_dir || null,
       });
       setMountStatuses({ ...mountStatuses, [conn.id]: status });
 
@@ -493,6 +498,17 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             >
               <ArrowsClockwise size={15} weight="bold" />
               Refresh
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5 text-[13px]"
+              onClick={() => setShowUpload(true)}
+              disabled={totalActive === 0}
+              title={totalActive === 0 ? "Mount a drive first" : "Upload files directly — bypasses VFS cache"}
+            >
+              <CloudArrowUp size={15} weight="bold" />
+              Direct Upload
             </Button>
             <Button
               variant="primary"
@@ -827,6 +843,18 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           </Card>
         )}
       </div>
+
+      <DirectUploadModal
+        open={showUpload}
+        onClose={() => setShowUpload(false)}
+        mountedConnections={connections
+          .filter(c => mountStatuses[c.id]?.state === "mounted")
+          .map(c => ({
+            id: c.id,
+            name: c.name,
+            activeUrl: mountStatuses[c.id]?.active_url || "",
+          }))}
+      />
     </div>
   );
 }

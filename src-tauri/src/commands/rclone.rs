@@ -1,7 +1,9 @@
 // Rclone command handlers
 
 use tauri::command;
+use tauri::Emitter;
 use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandEvent;
 use std::sync::Mutex;
 use std::collections::HashMap;
 use crate::config::{Connection, MountStatus, MountState, NetworkMode};
@@ -246,6 +248,7 @@ pub async fn get_available_drives() -> Result<Vec<String>, String> {
 pub async fn mount_drive(
     app: tauri::AppHandle,
     connection_json: String,
+    cache_dir: Option<String>,
 ) -> Result<MountStatus, String> {
     let connection: Connection = serde_json::from_str(&connection_json)
         .map_err(|e| format!("Invalid connection data: {}", e))?;
@@ -344,6 +347,11 @@ pub async fn mount_drive(
         // the OS drive. rclone will evict or block before hitting this floor.
         "--vfs-cache-min-free-space".to_string(),
         "10G".to_string(),
+        // Start uploading immediately when the file handle closes instead
+        // of waiting the default 5s. Reduces the window where a crash could
+        // lose data sitting in the local cache.
+        "--vfs-write-back".to_string(),
+        "0s".to_string(),
         "--vfs-read-ahead".to_string(),
         vfs_read_ahead,
         "--buffer-size".to_string(),
@@ -367,6 +375,12 @@ pub async fn mount_drive(
     }
     if !profile_config.network_mode {
         args.push("--network-mode=false".to_string());
+    }
+    if let Some(ref dir) = cache_dir {
+        if !dir.is_empty() {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
     }
 
     // Check if drive letter is already in use before spawning
@@ -493,6 +507,12 @@ pub async fn mount_drive(
                         "--network-mode=false".to_string(),
                         format!("--volname={} (Archive)", connection.name),
                     ]);
+                    if let Some(ref dir) = cache_dir {
+                        if !dir.is_empty() {
+                            archive_args.push("--cache-dir".to_string());
+                            archive_args.push(dir.clone());
+                        }
+                    }
 
                     if let Ok((_rx, archive_child)) = app.shell().command("rclone").args(&archive_args).spawn() {
                         let apid = archive_child.pid();
@@ -940,4 +960,108 @@ pub async fn list_external_rclone_mounts() -> Result<Vec<ExternalMount>, String>
 
         Ok(mounts)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Direct Upload — streams files to a remote via `rclone copy`, bypassing VFS
+// ---------------------------------------------------------------------------
+
+#[command]
+pub async fn direct_upload(
+    app: tauri::AppHandle,
+    source_path: String,
+    remote_name: String,
+    dest_path: String,
+    transfers: u32,
+    webdav_url: Option<String>,
+    cache_dir: Option<String>,
+) -> Result<u32, String> {
+    let remote_dest = if dest_path.is_empty() || dest_path == "/" {
+        format!("{}:", remote_name)
+    } else {
+        format!("{}:{}", remote_name, dest_path)
+    };
+
+    let mut args = config_args();
+    args.extend([
+        "copy".to_string(),
+        source_path,
+        remote_dest,
+        "-P".to_string(),
+        "--transfers".to_string(),
+        transfers.to_string(),
+    ]);
+    if let Some(ref url) = webdav_url {
+        if !url.is_empty() {
+            args.push("--webdav-url".to_string());
+            args.push(url.clone());
+        }
+    }
+    if let Some(ref dir) = cache_dir {
+        if !dir.is_empty() {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+    }
+
+    let (mut rx, child) = app
+        .shell()
+        .command("rclone")
+        .args(&args)
+        .spawn()
+        .map_err(|e| format!("Failed to spawn rclone copy: {}", e))?;
+
+    let pid = child.pid();
+    let handle = app.clone();
+
+    // Stream rclone -P output to the frontend as events
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                CommandEvent::Stdout(bytes) => {
+                    let text = String::from_utf8_lossy(&bytes);
+                    let _ = handle.emit("upload-progress", serde_json::json!({
+                        "pid": pid,
+                        "line": text.to_string(),
+                    }));
+                }
+                CommandEvent::Stderr(bytes) => {
+                    let text = String::from_utf8_lossy(&bytes);
+                    let _ = handle.emit("upload-progress", serde_json::json!({
+                        "pid": pid,
+                        "line": text.to_string(),
+                    }));
+                }
+                CommandEvent::Terminated(status) => {
+                    let _ = handle.emit("upload-complete", serde_json::json!({
+                        "pid": pid,
+                        "code": status.code.unwrap_or(-1),
+                    }));
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
+
+    Ok(pid)
+}
+
+#[command]
+pub async fn cancel_upload(pid: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .output()
+            .map_err(|e| format!("Failed to kill upload process: {}", e))?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        std::process::Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output()
+            .map_err(|e| format!("Failed to kill upload process: {}", e))?;
+    }
+    Ok(())
 }

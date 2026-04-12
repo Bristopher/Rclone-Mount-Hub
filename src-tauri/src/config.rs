@@ -176,6 +176,8 @@ pub struct AppSettings {
     pub show_notifications: bool,
     #[serde(default)]
     pub network_change_mode: NetworkChangeMode,
+    #[serde(default)]
+    pub cache_dir: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -189,6 +191,7 @@ impl Default for AppSettings {
             default_network_mode: NetworkMode::Auto,
             show_notifications: true,
             network_change_mode: NetworkChangeMode::default(),
+            cache_dir: None,
         }
     }
 }

@@ -101,6 +101,22 @@ export function Settings() {
     toast.success("Reset to rclone default config path");
   };
 
+  const handleBrowseCacheDir = async () => {
+    const selected = await openFilePicker({
+      title: "Select VFS Cache Directory",
+      directory: true,
+    });
+    if (selected && typeof selected === "string") {
+      update({ cache_dir: selected });
+      toast.success("Cache directory updated");
+    }
+  };
+
+  const handleResetCacheDir = () => {
+    update({ cache_dir: "" });
+    toast.success("Reset to rclone default cache directory");
+  };
+
   const handleAddToStartMenu = async () => {
     try {
       await invoke("add_to_start_menu");
@@ -624,6 +640,38 @@ export function Settings() {
                 <p className="text-[11px] text-text-tertiary">
                   Using default: <span className="font-mono text-text-secondary">{defaultConfigPath}</span>
                 </p>
+              )}
+            </div>
+          </Card>
+
+          {/* Section E2 - VFS Cache Directory */}
+          <Card className="p-6">
+            <h2 className="text-base font-semibold text-text-primary mb-5 flex items-center gap-2">
+              <FolderOpen size={18} weight="duotone" className="text-accent-amber" />
+              VFS Cache Directory
+            </h2>
+            <p className="text-[11px] text-text-tertiary mb-4">
+              Rclone caches file writes to your OS drive by default. Point this at a drive with more space to avoid filling up C:\ when copying large files (e.g. VM images).
+            </p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={settings.cache_dir}
+                  onChange={(e) => update({ cache_dir: e.target.value })}
+                  placeholder="%LOCALAPPDATA%\\rclone (default)"
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-blue/50 font-mono"
+                />
+                <Button variant="ghost" size="sm" onClick={handleBrowseCacheDir} className="gap-1.5 shrink-0">
+                  <FolderOpen size={15} weight="bold" />
+                  Browse
+                </Button>
+              </div>
+              {settings.cache_dir && (
+                <Button variant="ghost" size="sm" onClick={handleResetCacheDir} className="gap-1.5 text-text-tertiary">
+                  <ArrowsClockwise size={13} weight="bold" />
+                  Reset to default
+                </Button>
               )}
             </div>
           </Card>

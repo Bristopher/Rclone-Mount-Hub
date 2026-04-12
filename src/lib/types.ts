@@ -59,6 +59,7 @@ export interface AppSettings {
   show_notifications: boolean;
   rclone_config_path: string;
   network_change_mode: NetworkChangeMode;
+  cache_dir: string;
 }
 
 export interface SpeedProfileInfo {
