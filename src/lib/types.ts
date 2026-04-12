@@ -9,7 +9,8 @@ export interface Connection {
   tailscale_ip: string;
   port: number;
   drive_letter: string;
-  protocol: "webdav";
+  protocol: string;
+  vendor: string; // server software: copyparty, sftpgo, openssh, etc.
   username: string;
   network_mode: NetworkMode;
   speed_profile: SpeedProfile;

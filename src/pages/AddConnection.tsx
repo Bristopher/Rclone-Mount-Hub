@@ -43,7 +43,7 @@ const REMOTE_TYPES = [
     label: "SFTP",
     icon: Desktop,
     color: "accent-purple",
-    desc: "SSH file transfer",
+    desc: "SFTPGo, OpenSSH",
   },
   {
     id: "smb",
@@ -79,6 +79,13 @@ const WEBDAV_VENDORS = [
   { value: "other", label: "Other WebDAV" },
 ];
 
+// SFTP server software options
+const SFTP_VENDORS = [
+  { value: "sftpgo", label: "SFTPGo" },
+  { value: "openssh", label: "OpenSSH" },
+  { value: "other", label: "Other SFTP Server" },
+];
+
 export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
   const { add } = useConnectionStore();
   const { addLog } = useLogStore();
@@ -108,6 +115,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [webdavVendor, setWebdavVendor] = useState("copyparty");
+  const [sftpVendor, setSftpVendor] = useState("sftpgo");
 
   // S3 fields
   const [s3Provider, setS3Provider] = useState("AWS");
@@ -311,6 +319,10 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
         params: buildRcloneParams(),
       });
 
+      const vendor = remoteType === "webdav" ? webdavVendor
+        : remoteType === "sftp" ? sftpVendor
+        : "";
+
       const connection: Connection = {
         id: crypto.randomUUID(),
         name,
@@ -320,7 +332,8 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
         tailscale_ip: tailscaleIp,
         port: parseInt(port) || 0,
         drive_letter: driveLetter,
-        protocol: "webdav",
+        protocol: remoteType,
+        vendor,
         username,
         network_mode: networkMode,
         speed_profile: speedProfile,
@@ -526,13 +539,37 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                 {remoteType.toUpperCase()} Settings
               </h2>
               <div className="space-y-4">
+                {remoteType === "sftp" && (
+                  <div>
+                    <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                      Server Software
+                    </label>
+                    <select
+                      value={sftpVendor}
+                      onChange={(e) => setSftpVendor(e.target.value)}
+                      className="w-full bg-bg-overlay border border-border-default rounded-lg px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-accent-blue/60"
+                    >
+                      {SFTP_VENDORS.map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    {sftpVendor === "sftpgo" && (
+                      <p className="text-[11px] text-text-tertiary mt-1.5">
+                        SFTPGo mode enables high concurrency, chunked transfers, and disables modtime (optimal for S3/GCS backends).
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="col-span-2">
                     <Input
-                      label="Host / IP"
+                      label="Host / IP (LAN)"
                       placeholder="192.168.x.x"
                       value={host}
                       onChange={(e) => { setHost(e.target.value); setTestResult(null); }}
+                      hint="Local network address"
                     />
                   </div>
                   <Input
@@ -548,6 +585,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                   placeholder="100.x.x.x"
                   value={tailscaleIp}
                   onChange={(e) => setTailscaleIp(e.target.value)}
+                  hint="Used when away from home"
                 />
               </div>
             </Card>

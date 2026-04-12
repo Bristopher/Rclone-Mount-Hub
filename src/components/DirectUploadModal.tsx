@@ -18,7 +18,10 @@ import { open as openPicker } from "@tauri-apps/plugin-dialog";
 interface MountedConnection {
   id: string;
   name: string;
+  remoteType: string;
   activeUrl: string;
+  port: number;
+  vendor: string;
 }
 
 interface DirectUploadModalProps {
@@ -153,13 +156,23 @@ export function DirectUploadModal({
 
     const conn = mountedConnections.find((c) => c.name === selectedConnection);
 
+    // Extract host from activeUrl (format: "host:port" or "http://host:port")
+    let activeHost: string | null = null;
+    if (conn?.activeUrl) {
+      const cleaned = conn.activeUrl.replace(/^https?:\/\//, "");
+      activeHost = cleaned.split(":")[0] || null;
+    }
+
     try {
       const pid = await invoke<number>("direct_upload", {
         sourcePath,
         remoteName: selectedConnection,
         destPath: destPath || "/",
         transfers: 4,
-        webdavUrl: conn?.activeUrl || null,
+        remoteType: conn?.remoteType || "webdav",
+        activeHost,
+        activePort: conn?.port || null,
+        vendor: conn?.vendor || null,
         cacheDir: settings.cache_dir || null,
       });
       setUploadPid(pid);

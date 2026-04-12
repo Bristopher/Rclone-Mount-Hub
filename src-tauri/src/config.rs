@@ -15,6 +15,8 @@ pub struct Connection {
     pub port: u16,
     pub drive_letter: String,
     pub protocol: String,
+    #[serde(default)]
+    pub vendor: String, // server software: copyparty, sftpgo, openssh, etc.
     pub username: String,
     // Password is NOT stored here - it's in rclone's config
     pub network_mode: NetworkMode,

@@ -39,6 +39,12 @@ const WEBDAV_VENDORS = [
   { value: "other", label: "Other WebDAV" },
 ];
 
+const SFTP_VENDORS = [
+  { value: "sftpgo", label: "SFTPGo" },
+  { value: "openssh", label: "OpenSSH" },
+  { value: "other", label: "Other SFTP Server" },
+];
+
 export function EditConnection({ connection, onNavigate }: EditConnectionProps) {
   const { update } = useConnectionStore();
   const { addLog } = useLogStore();
@@ -61,7 +67,8 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
   const [autoMount, setAutoMount] = useState(connection.auto_mount);
   const [dualMount, setDualMount] = useState(connection.dual_mount ?? false);
   const [archiveDriveLetter, setArchiveDriveLetter] = useState(connection.archive_drive_letter || "");
-  const [webdavVendor, setWebdavVendor] = useState("copyparty");
+  const [webdavVendor, setWebdavVendor] = useState(connection.vendor || "copyparty");
+  const [sftpVendor, setSftpVendor] = useState(connection.vendor || "sftpgo");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [cacheOverrides, setCacheOverrides] = useState<Partial<CacheOverrides>>(
     connection.cache_overrides || {}
@@ -220,6 +227,10 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
       }
 
       // Update local store
+      const updatedVendor = remoteType === "webdav" ? webdavVendor
+        : remoteType === "sftp" ? sftpVendor
+        : connection.vendor || "";
+
       const updates: Partial<Connection> = {
         name,
         description,
@@ -228,6 +239,7 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
         tailscale_ip: tailscaleIp,
         port: parseInt(port) || connection.port,
         username,
+        vendor: updatedVendor,
         network_mode: networkMode,
         speed_profile: speedProfile,
         auto_mount: autoMount,
@@ -356,6 +368,27 @@ export function EditConnection({ connection, onNavigate }: EditConnectionProps) 
                         <option key={v.value} value={v.value}>{v.label}</option>
                       ))}
                     </select>
+                  </div>
+                )}
+                {remoteType === "sftp" && (
+                  <div>
+                    <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                      Server Software
+                    </label>
+                    <select
+                      value={sftpVendor}
+                      onChange={(e) => setSftpVendor(e.target.value)}
+                      className="w-full bg-bg-overlay border border-border-default rounded-lg px-3 py-2 text-[13px] text-text-primary focus:outline-none focus:border-accent-blue/60"
+                    >
+                      {SFTP_VENDORS.map((v) => (
+                        <option key={v.value} value={v.value}>{v.label}</option>
+                      ))}
+                    </select>
+                    {sftpVendor === "sftpgo" && (
+                      <p className="text-[11px] text-text-tertiary mt-1.5">
+                        SFTPGo mode enables high concurrency, chunked transfers, and disables modtime (optimal for S3/GCS backends).
+                      </p>
+                    )}
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-4">

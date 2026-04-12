@@ -852,7 +852,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           .map(c => ({
             id: c.id,
             name: c.name,
+            remoteType: c.remote_type || "webdav",
             activeUrl: mountStatuses[c.id]?.active_url || "",
+            port: c.port,
+            vendor: c.vendor || "",
           }))}
       />
     </div>

@@ -259,7 +259,8 @@ pub async fn mount_drive(
     let tailscale_ip = &connection.tailscale_ip;
     let port = connection.port;
 
-    let (url, active_mode, mount_log) = match connection.network_mode {
+    // Resolve which host to use (LAN vs Tailscale) — protocol-agnostic
+    let (active_host, active_mode, mount_log) = match connection.network_mode {
         NetworkMode::Auto => {
             let local_reachable = if !local_ip.is_empty() {
                 ping_port(local_ip.clone(), port, 1500).await.unwrap_or(false)
@@ -278,10 +279,10 @@ pub async fn mount_drive(
                 } else {
                     format!("Local {}:{} reachable.", local_ip, port)
                 };
-                (format!("http://{}:{}", local_ip, port), "local".to_string(), log)
+                (local_ip.to_string(), "local".to_string(), log)
             } else if tailscale_reachable {
                 let log = format!("Local {}:{} unreachable, connected via Tailscale ({}:{}).", local_ip, port, tailscale_ip, port);
-                (format!("http://{}:{}", tailscale_ip, port), "tailscale".to_string(), log)
+                (tailscale_ip.to_string(), "tailscale".to_string(), log)
             } else {
                 let mut msg = format!("Neither local ({}:{}) nor Tailscale ({}:{}) is reachable.", local_ip, port, tailscale_ip, port);
                 if local_ip.is_empty() && tailscale_ip.is_empty() {
@@ -299,7 +300,7 @@ pub async fn mount_drive(
                 return Err(format!("Local IP {}:{} is not reachable. Check that your server is running.", local_ip, port));
             }
             let log = format!("Local {}:{} reachable.", local_ip, port);
-            (format!("http://{}:{}", local_ip, port), "local".to_string(), log)
+            (local_ip.to_string(), "local".to_string(), log)
         },
         NetworkMode::Tailscale => {
             if tailscale_ip.is_empty() {
@@ -310,8 +311,15 @@ pub async fn mount_drive(
                 return Err(format!("Tailscale IP {}:{} is not reachable. Check that Tailscale is connected.", tailscale_ip, port));
             }
             let log = format!("Tailscale {}:{} reachable.", tailscale_ip, port);
-            (format!("http://{}:{}", tailscale_ip, port), "tailscale".to_string(), log)
+            (tailscale_ip.to_string(), "tailscale".to_string(), log)
         },
+    };
+
+    // Build a display URL for logs/UI (always stored as active_url)
+    let remote_type = connection.remote_type.as_str();
+    let url = match remote_type {
+        "webdav" => format!("http://{}:{}", active_host, port),
+        _ => format!("{}:{}", active_host, port),
     };
 
     // Get speed profile configuration
@@ -337,8 +345,56 @@ pub async fn mount_drive(
         "mount".to_string(),
         remote,
         drive.clone(),
-        "--webdav-url".to_string(),
-        url.clone(),
+    ]);
+
+    // Protocol-specific host override flags so network switching works
+    match remote_type {
+        "webdav" => {
+            args.push("--webdav-url".to_string());
+            args.push(format!("http://{}:{}", active_host, port));
+        }
+        "sftp" => {
+            args.push("--sftp-host".to_string());
+            args.push(active_host.clone());
+            args.push("--sftp-port".to_string());
+            args.push(port.to_string());
+            // SFTPGo optimizations
+            let vendor = connection.vendor.as_str();
+            if vendor == "sftpgo" {
+                // SFTPGo handles high concurrency well
+                args.push("--sftp-concurrency".to_string());
+                args.push("16".to_string());
+                args.push("--sftp-idle-timeout".to_string());
+                args.push("60s".to_string());
+                args.push("--sftp-chunk-size".to_string());
+                args.push("64k".to_string());
+                // Disable set-modtime — SFTPGo backends (S3/GCS) may not support it
+                args.push("--sftp-set-modtime".to_string());
+                args.push("false".to_string());
+            } else if vendor == "openssh" {
+                args.push("--sftp-concurrency".to_string());
+                args.push("8".to_string());
+            }
+        }
+        "ftp" => {
+            args.push("--ftp-host".to_string());
+            args.push(active_host.clone());
+            args.push("--ftp-port".to_string());
+            args.push(port.to_string());
+            args.push("--ftp-concurrency".to_string());
+            args.push("8".to_string());
+        }
+        "smb" => {
+            args.push("--smb-host".to_string());
+            args.push(active_host.clone());
+            args.push("--smb-port".to_string());
+            args.push(port.to_string());
+        }
+        // S3 uses endpoint from rclone config, no host override needed
+        _ => {}
+    }
+
+    args.extend([
         "--vfs-cache-mode".to_string(),
         vfs_cache_mode,
         "--vfs-cache-max-size".to_string(),
@@ -481,8 +537,43 @@ pub async fn mount_drive(
                         "mount".to_string(),
                         archive_remote,
                         archive_drive,
-                        "--webdav-url".to_string(),
-                        url.clone(),
+                    ]);
+
+                    // Protocol-specific host override for archive mount
+                    match remote_type {
+                        "webdav" => {
+                            archive_args.push("--webdav-url".to_string());
+                            archive_args.push(format!("http://{}:{}", active_host, port));
+                        }
+                        "sftp" => {
+                            archive_args.push("--sftp-host".to_string());
+                            archive_args.push(active_host.clone());
+                            archive_args.push("--sftp-port".to_string());
+                            archive_args.push(port.to_string());
+                            let vendor = connection.vendor.as_str();
+                            if vendor == "sftpgo" {
+                                archive_args.push("--sftp-concurrency".to_string());
+                                archive_args.push("16".to_string());
+                                archive_args.push("--sftp-set-modtime".to_string());
+                                archive_args.push("false".to_string());
+                            }
+                        }
+                        "ftp" => {
+                            archive_args.push("--ftp-host".to_string());
+                            archive_args.push(active_host.clone());
+                            archive_args.push("--ftp-port".to_string());
+                            archive_args.push(port.to_string());
+                        }
+                        "smb" => {
+                            archive_args.push("--smb-host".to_string());
+                            archive_args.push(active_host.clone());
+                            archive_args.push("--smb-port".to_string());
+                            archive_args.push(port.to_string());
+                        }
+                        _ => {}
+                    }
+
+                    archive_args.extend([
                         "--vfs-cache-mode".to_string(),
                         "full".to_string(),
                         "--vfs-cache-max-size".to_string(),
@@ -973,7 +1064,10 @@ pub async fn direct_upload(
     remote_name: String,
     dest_path: String,
     transfers: u32,
-    webdav_url: Option<String>,
+    remote_type: String,
+    active_host: Option<String>,
+    active_port: Option<u16>,
+    vendor: Option<String>,
     cache_dir: Option<String>,
 ) -> Result<u32, String> {
     let remote_dest = if dest_path.is_empty() || dest_path == "/" {
@@ -991,12 +1085,44 @@ pub async fn direct_upload(
         "--transfers".to_string(),
         transfers.to_string(),
     ]);
-    if let Some(ref url) = webdav_url {
-        if !url.is_empty() {
-            args.push("--webdav-url".to_string());
-            args.push(url.clone());
+
+    // Protocol-specific host overrides for the copy operation
+    if let (Some(ref host), Some(port)) = (&active_host, active_port) {
+        if !host.is_empty() {
+            match remote_type.as_str() {
+                "webdav" => {
+                    args.push("--webdav-url".to_string());
+                    args.push(format!("http://{}:{}", host, port));
+                }
+                "sftp" => {
+                    args.push("--sftp-host".to_string());
+                    args.push(host.clone());
+                    args.push("--sftp-port".to_string());
+                    args.push(port.to_string());
+                    if vendor.as_deref() == Some("sftpgo") {
+                        args.push("--sftp-concurrency".to_string());
+                        args.push("16".to_string());
+                        args.push("--sftp-set-modtime".to_string());
+                        args.push("false".to_string());
+                    }
+                }
+                "ftp" => {
+                    args.push("--ftp-host".to_string());
+                    args.push(host.clone());
+                    args.push("--ftp-port".to_string());
+                    args.push(port.to_string());
+                }
+                "smb" => {
+                    args.push("--smb-host".to_string());
+                    args.push(host.clone());
+                    args.push("--smb-port".to_string());
+                    args.push(port.to_string());
+                }
+                _ => {}
+            }
         }
     }
+
     if let Some(ref dir) = cache_dir {
         if !dir.is_empty() {
             args.push("--cache-dir".to_string());
