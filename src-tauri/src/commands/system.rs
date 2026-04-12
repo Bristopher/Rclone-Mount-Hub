@@ -646,6 +646,10 @@ pub async fn check_app_update() -> Result<AppUpdateInfo, String> {
 
 #[command]
 pub async fn apply_app_update() -> Result<(), String> {
+    // Kill all rclone mount processes before the update replaces files,
+    // otherwise the installer hits "Failed to remove existing application directory".
+    crate::commands::rclone::kill_all_mounts();
+
     tokio::task::spawn_blocking(|| {
         let source = velopack::sources::AutoSource::new(UPDATE_FEED_URL);
         let um = velopack::UpdateManager::new(source, None, None)
@@ -654,6 +658,7 @@ pub async fn apply_app_update() -> Result<(), String> {
             um.check_for_updates().map_err(|e| e.to_string())?
         {
             um.download_updates(&updates, None).map_err(|e| e.to_string())?;
+            // This restarts the app after applying; auto_mount reconnects drives on startup
             um.apply_updates_and_restart(&updates).map_err(|e| e.to_string())?;
         }
         Ok(())
