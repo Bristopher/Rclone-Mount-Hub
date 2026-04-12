@@ -177,6 +177,9 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|_app, event| {
             if let tauri::RunEvent::Exit = event {
+                // Kill all rclone mount processes we spawned so the installer
+                // can cleanly remove/replace the application directory.
+                commands::rclone::kill_all_mounts();
                 // Signal the network monitor thread to wake and exit cleanly
                 // before the process terminates, avoiding kernel handle leaks.
                 commands::network::stop_network_monitor();

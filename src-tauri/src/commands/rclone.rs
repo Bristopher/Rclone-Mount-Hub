@@ -84,6 +84,28 @@ fn remove_mount(connection_id: &str) {
     }
 }
 
+/// Kill every tracked rclone mount process. Called on app exit and before updates
+/// so the installer can cleanly replace files.
+pub fn kill_all_mounts() {
+    let mut lock = ACTIVE_MOUNTS.lock().unwrap();
+    if let Some(ref mut map) = *lock {
+        for (_id, info) in map.drain() {
+            #[cfg(target_os = "windows")]
+            {
+                let _ = crate::util::cmd("taskkill")
+                    .args(["/F", "/PID", &info.pid.to_string()])
+                    .output();
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = std::process::Command::new("kill")
+                    .args(["-9", &info.pid.to_string()])
+                    .output();
+            }
+        }
+    }
+}
+
 #[command]
 pub async fn check_rclone_installed(app: tauri::AppHandle) -> Result<bool, String> {
     let output = app

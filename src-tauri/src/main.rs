@@ -4,7 +4,18 @@
 fn main() {
     // Must be called before anything else — handles install/update/uninstall hooks
     velopack::VelopackApp::build()
+        .on_before_update_fast_callback(|_version| {
+            // Kill any rclone processes so the installer can replace files
+            // without "Failed to remove existing application directory" errors.
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/IM", "rclone.exe"])
+                .output();
+        })
         .on_before_uninstall_fast_callback(|_version| {
+            // Kill rclone processes before uninstall cleanup
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/IM", "rclone.exe"])
+                .output();
             // Clean up Tauri plugin store data left in %AppData%
             if let Ok(app_data) = std::env::var("APPDATA") {
                 let _ = std::fs::remove_dir_all(

@@ -23,6 +23,9 @@ pub async fn hide_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[command]
 pub async fn full_quit(app: tauri::AppHandle) {
+    // Kill all rclone processes before exiting so the installer can
+    // cleanly remove/update the application directory.
+    crate::commands::rclone::kill_all_mounts();
     app.exit(0);
 }
 
