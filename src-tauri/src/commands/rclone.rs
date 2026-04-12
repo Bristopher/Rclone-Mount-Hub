@@ -380,23 +380,10 @@ pub async fn mount_drive(
             args.push(active_host.clone());
             args.push("--sftp-port".to_string());
             args.push(port.to_string());
-            // SFTPGo optimizations
-            let vendor = connection.vendor.as_str();
-            if vendor == "sftpgo" {
-                // SFTPGo handles high concurrency well
-                args.push("--sftp-concurrency".to_string());
-                args.push("16".to_string());
-                args.push("--sftp-idle-timeout".to_string());
-                args.push("60s".to_string());
-                args.push("--sftp-chunk-size".to_string());
-                args.push("64k".to_string());
-                // Disable set-modtime — SFTPGo backends (S3/GCS) may not support it
-                args.push("--sftp-set-modtime".to_string());
-                args.push("false".to_string());
-            } else if vendor == "openssh" {
-                args.push("--sftp-concurrency".to_string());
-                args.push("8".to_string());
-            }
+            // No forced vendor flags — SFTPGo works fine with rclone defaults.
+            // set-modtime / disable-hashcheck only matter if the SFTPGo backend
+            // is object storage (S3/GCS); users can toggle those via advanced
+            // cache settings per-connection if needed.
         }
         "ftp" => {
             args.push("--ftp-host".to_string());
@@ -458,6 +445,14 @@ pub async fn mount_drive(
         if !dir.is_empty() {
             args.push("--cache-dir".to_string());
             args.push(dir.clone());
+        }
+    }
+
+    // Append user-defined custom flags (e.g. --sftp-set-modtime=false)
+    for flag in &connection.custom_flags {
+        let trimmed = flag.trim();
+        if !trimmed.is_empty() {
+            args.push(trimmed.to_string());
         }
     }
 
@@ -572,13 +567,7 @@ pub async fn mount_drive(
                             archive_args.push(active_host.clone());
                             archive_args.push("--sftp-port".to_string());
                             archive_args.push(port.to_string());
-                            let vendor = connection.vendor.as_str();
-                            if vendor == "sftpgo" {
-                                archive_args.push("--sftp-concurrency".to_string());
-                                archive_args.push("16".to_string());
-                                archive_args.push("--sftp-set-modtime".to_string());
-                                archive_args.push("false".to_string());
-                            }
+                            // No forced vendor flags for archive mount either
                         }
                         "ftp" => {
                             archive_args.push("--ftp-host".to_string());
@@ -1089,7 +1078,7 @@ pub async fn direct_upload(
     remote_type: String,
     active_host: Option<String>,
     active_port: Option<u16>,
-    vendor: Option<String>,
+    _vendor: Option<String>,
     cache_dir: Option<String>,
 ) -> Result<u32, String> {
     let remote_dest = if dest_path.is_empty() || dest_path == "/" {
@@ -1121,12 +1110,7 @@ pub async fn direct_upload(
                     args.push(host.clone());
                     args.push("--sftp-port".to_string());
                     args.push(port.to_string());
-                    if vendor.as_deref() == Some("sftpgo") {
-                        args.push("--sftp-concurrency".to_string());
-                        args.push("16".to_string());
-                        args.push("--sftp-set-modtime".to_string());
-                        args.push("false".to_string());
-                    }
+                    // No forced vendor flags for uploads
                 }
                 "ftp" => {
                     args.push("--ftp-host".to_string());

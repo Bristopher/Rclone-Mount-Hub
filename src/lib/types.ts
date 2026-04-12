@@ -18,6 +18,7 @@ export interface Connection {
   sort_order: number;
   created_at: string;
   cache_overrides?: CacheOverrides;
+  custom_flags: string[]; // Extra rclone CLI flags appended to mount command
   dual_mount: boolean;
   archive_drive_letter?: string;
 }

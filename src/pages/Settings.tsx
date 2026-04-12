@@ -924,6 +924,23 @@ export function Settings() {
             </div>
           </Card>
 
+          {/* Troubleshooting */}
+          <Card className="p-5 space-y-2">
+            <h3 className="text-[13px] font-semibold text-text-primary">Troubleshooting</h3>
+            <div className="text-[12px] text-text-secondary space-y-1.5">
+              <p>
+                <span className="text-text-primary font-medium">Installer fails with "Failed to remove existing application directory":</span>{" "}
+                Make sure Rclone Mount Hub is fully closed (check system tray) and all rclone processes are stopped before running the installer. The app unmounts drives automatically on exit, but if it crashed, run{" "}
+                <code className="px-1 py-0.5 rounded bg-white/[0.06] text-[11px] font-mono">taskkill /F /IM rclone.exe</code>{" "}
+                in a terminal first.
+              </p>
+              <p>
+                <span className="text-text-primary font-medium">Drive shows in Explorer but can't connect:</span>{" "}
+                The rclone mount process started but the remote connection failed. Unmount, check your credentials and server address, then try again.
+              </p>
+            </div>
+          </Card>
+
           {/* Actions */}
           <div className="flex items-center gap-3 pt-2">
             <Button

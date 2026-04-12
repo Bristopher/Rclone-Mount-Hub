@@ -107,6 +107,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
   const [archiveDriveLetter, setArchiveDriveLetter] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [cacheOverrides, setCacheOverrides] = useState<Partial<CacheOverrides>>({});
+  const [customFlags, setCustomFlags] = useState("");
 
   // WebDAV / SFTP / FTP / SMB fields
   const [host, setHost] = useState("");
@@ -341,6 +342,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
         sort_order: Date.now(),
         created_at: new Date().toISOString(),
         cache_overrides: Object.values(cacheOverrides).some(v => v !== undefined) ? cacheOverrides as CacheOverrides : undefined,
+        custom_flags: customFlags.split("\n").map(s => s.trim()).filter(Boolean),
         dual_mount: dualMount,
         archive_drive_letter: dualMount && archiveDriveLetter ? archiveDriveLetter : undefined,
       };
@@ -557,7 +559,7 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                     </select>
                     {sftpVendor === "sftpgo" && (
                       <p className="text-[11px] text-text-tertiary mt-1.5">
-                        SFTPGo mode enables high concurrency, chunked transfers, and disables modtime (optimal for S3/GCS backends).
+                        Add custom rclone flags in Advanced Settings below (e.g. --sftp-set-modtime=false for object-storage backends).
                       </p>
                     )}
                   </div>
@@ -882,11 +884,28 @@ export function AddConnection({ onNavigate }: AddConnectionProps = {}) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCacheOverrides({})}
+                  onClick={() => { setCacheOverrides({}); setCustomFlags(""); }}
                   className="text-text-tertiary"
                 >
-                  Reset to Profile Defaults
+                  Reset to Defaults
                 </Button>
+
+                {/* Custom rclone flags */}
+                <div className="pt-3 border-t border-white/[0.06]">
+                  <label className="block text-[13px] font-medium text-text-secondary mb-2">
+                    Extra Rclone Flags
+                  </label>
+                  <textarea
+                    value={customFlags}
+                    onChange={(e) => setCustomFlags(e.target.value)}
+                    placeholder="--sftp-set-modtime=false&#10;--sftp-disable-hashcheck&#10;--checkers 8"
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-[13px] text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-blue/50 font-mono resize-y"
+                  />
+                  <p className="text-[11px] text-text-tertiary mt-1">
+                    One flag per line. Appended to the rclone mount command after all other settings.
+                  </p>
+                </div>
               </div>
             )}
           </Card>

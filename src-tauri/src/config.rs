@@ -27,6 +27,8 @@ pub struct Connection {
     #[serde(default)]
     pub cache_overrides: Option<CacheOverrides>,
     #[serde(default)]
+    pub custom_flags: Vec<String>, // Extra rclone CLI flags appended to the mount command
+    #[serde(default)]
     pub dual_mount: bool,
     #[serde(default)]
     pub archive_drive_letter: Option<String>,
