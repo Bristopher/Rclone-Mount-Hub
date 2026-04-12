@@ -50,7 +50,7 @@ interface RcloneRemote {
 }
 
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
-  const { connections, remove } = useConnectionStore();
+  const { connections, remove, add } = useConnectionStore();
   const { addLog } = useLogStore();
   const { setMountSummary } = useMountSummaryStore();
   const { settings } = useSettingsStore();
@@ -467,6 +467,69 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   };
 
+  const handleImportRemote = async (remote: RcloneRemote) => {
+    try {
+      // Read the full rclone config to extract connection details
+      const dump = await invoke<string>("get_rclone_config_dump");
+      const config = JSON.parse(dump);
+      const remoteConfig = config[remote.name] || {};
+
+      const remoteType = remoteConfig.type || remote.remote_type || "webdav";
+      const host = remoteConfig.host || "";
+      const port = parseInt(remoteConfig.port) || (
+        remoteType === "sftp" ? 22 : remoteType === "ftp" ? 21 : remoteType === "smb" ? 445 : 80
+      );
+      const username = remoteConfig.user || "";
+      const vendor = remoteConfig.vendor || "";
+
+      // For WebDAV, extract host/port from the url field
+      let localIp = host;
+      let importPort = port;
+      if (remoteType === "webdav" && remoteConfig.url) {
+        try {
+          const parsed = new URL(remoteConfig.url);
+          localIp = parsed.hostname;
+          importPort = parseInt(parsed.port) || 80;
+        } catch { /* keep defaults */ }
+      }
+
+      // Find a free drive letter
+      const usedLetters = new Set(connections.map(c => c.drive_letter.toUpperCase()));
+      const freeLetter = Array.from("ZYXWVUTSRQPONMLKJIHGFED").find(
+        l => !usedLetters.has(l)
+      ) || "Z";
+
+      const connection: Connection = {
+        id: crypto.randomUUID(),
+        name: remote.name,
+        description: "Imported from rclone config",
+        remote_type: remoteType,
+        local_ip: localIp,
+        tailscale_ip: "",
+        port: importPort,
+        drive_letter: freeLetter,
+        protocol: remoteType,
+        vendor,
+        username,
+        network_mode: settings.default_network_mode,
+        speed_profile: settings.default_speed_profile,
+        auto_mount: false,
+        sort_order: Date.now(),
+        created_at: new Date().toISOString(),
+        custom_flags: [],
+        dual_mount: false,
+      };
+
+      add(connection);
+      addLog("success", `Imported "${remote.name}" — edit it to set IP, drive letter, and other settings`, "mounts");
+      toast.success(`Imported "${remote.name}" into the app. Edit it to configure fully.`);
+      await refreshExternalMounts();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`Import failed: ${msg}`);
+    }
+  };
+
   const activeMounts = Object.values(mountStatuses).filter(s => s.state === "mounted").length;
   const totalActive = activeMounts + externalMounts.length;
   const driversInstalled = driverVersions?.rclone_installed && driverVersions?.winfsp_installed;
@@ -797,11 +860,20 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                         )}
                       </div>
                       <div className="text-[13px] text-text-secondary">
-                        Configured in rclone but not managed by this app
+                        In rclone config but not managed here — import to edit and mount
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleImportRemote(remote)}
+                        className="gap-1.5"
+                      >
+                        <CloudArrowDown size={14} weight="bold" />
+                        Import
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
