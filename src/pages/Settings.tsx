@@ -242,7 +242,7 @@ export function Settings() {
   const handleCheckAppUpdate = async () => {
     setUpdateStatus("checking");
     try {
-      const result = await invoke<{ available: boolean; version: string | null }>("check_app_update");
+      const result = await invoke<{ available: boolean; version: string | null; release_notes: string | null; download_size: number | null }>("check_app_update");
       if (result.available && result.version) {
         setAvailableVersion(result.version);
         setUpdateStatus("available");

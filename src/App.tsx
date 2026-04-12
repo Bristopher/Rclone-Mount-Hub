@@ -12,10 +12,20 @@ import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore, useConnectionStore } from "./lib/store";
 import type { Connection } from "./lib/types";
 
+interface UpdateInfo {
+  version: string;
+  releaseNotes: string | null;
+  downloadSize: number | null;
+}
+
 function App() {
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const [quitting, setQuitting] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null);
   const { settings } = useSettingsStore();
   const { connections } = useConnectionStore();
 
@@ -53,6 +63,51 @@ function App() {
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
+  // Check for app updates on startup
+  useEffect(() => {
+    const checkUpdate = async () => {
+      try {
+        const result = await invoke<{
+          available: boolean;
+          version: string | null;
+          release_notes: string | null;
+          download_size: number | null;
+        }>("check_app_update");
+        if (result.available && result.version) {
+          setUpdateInfo({
+            version: result.version,
+            releaseNotes: result.release_notes,
+            downloadSize: result.download_size,
+          });
+        }
+      } catch {
+        // Silently fail — user can manually check in Settings
+      }
+    };
+    const timer = setTimeout(checkUpdate, 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Listen for download progress events
+  useEffect(() => {
+    const unlisten = listen<number>("update-download-progress", (event) => {
+      setDownloadProgress(event.payload);
+    });
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
+
+  const handleApplyUpdate = async () => {
+    setUpdating(true);
+    setDownloadProgress(0);
+    try {
+      await invoke("apply_app_update");
+      // apply_updates_and_restart restarts the app — this line won't be reached
+    } catch {
+      setUpdating(false);
+      setDownloadProgress(null);
+    }
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case "dashboard":
@@ -74,9 +129,73 @@ function App() {
     }
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <>
+      {/* Persistent update banner */}
+      {updateInfo && !updateDismissed && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-accent-blue/90 to-indigo-600/90 backdrop-blur-sm border-b border-white/10 shadow-lg" data-tauri-drag-region>
+          <div className="px-4 py-2.5 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 text-[13px] font-medium text-white">
+                <span>v{updateInfo.version} available</span>
+                {updateInfo.downloadSize && (
+                  <span className="text-white/60 text-[11px]">
+                    ({formatBytes(updateInfo.downloadSize)})
+                  </span>
+                )}
+              </div>
+              {updateInfo.releaseNotes && !updating && (
+                <div className="text-[11px] text-white/70 truncate mt-0.5">
+                  {updateInfo.releaseNotes.split("\n")[0].replace(/^#+\s*/, "")}
+                </div>
+              )}
+              {updating && downloadProgress !== null && (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-white/20 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-white transition-all duration-300"
+                      style={{ width: `${downloadProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-white/80 font-mono w-8 text-right">
+                    {downloadProgress}%
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {!updating ? (
+                <>
+                  <button
+                    onClick={handleApplyUpdate}
+                    className="px-3 py-1 rounded-md bg-white text-indigo-700 text-[12px] font-semibold hover:bg-white/90 transition-colors"
+                  >
+                    Update & Restart
+                  </button>
+                  <button
+                    onClick={() => setUpdateDismissed(true)}
+                    className="text-white/60 hover:text-white transition-colors text-[18px] leading-none px-1"
+                  >
+                    &times;
+                  </button>
+                </>
+              ) : (
+                <span className="text-[12px] text-white/80 font-medium">
+                  {downloadProgress !== null && downloadProgress >= 100 ? "Restarting..." : "Downloading..."}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <AppLayout currentPage={currentPage} onNavigate={navigateTo}>
+        {/* Push content down when banner is showing */}
+        {updateInfo && !updateDismissed && <div className="h-[52px]" />}
         {renderPage()}
       </AppLayout>
       <Toaster position="bottom-right" theme="dark" />

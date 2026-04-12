@@ -619,7 +619,11 @@ const UPDATE_FEED_URL: &str = "https://github.com/Bristopher/Rclone-Mount-Hub/re
 pub struct AppUpdateInfo {
     pub available: bool,
     pub version: Option<String>,
+    pub release_notes: Option<String>,
+    pub download_size: Option<u64>,
 }
+
+const GITHUB_API_URL: &str = "https://api.github.com/repos/Bristopher/Rclone-Mount-Hub/releases/latest";
 
 #[command]
 pub async fn get_app_version() -> String {
@@ -628,37 +632,100 @@ pub async fn get_app_version() -> String {
 
 #[command]
 pub async fn check_app_update() -> Result<AppUpdateInfo, String> {
-    tokio::task::spawn_blocking(|| {
+    // Check Velopack for available updates
+    let velopack_result: Option<String> = tokio::task::spawn_blocking(|| -> Result<Option<String>, String> {
         let source = velopack::sources::AutoSource::new(UPDATE_FEED_URL);
         let um = velopack::UpdateManager::new(source, None, None)
             .map_err(|e| e.to_string())?;
         match um.check_for_updates().map_err(|e| e.to_string())? {
-            velopack::UpdateCheck::UpdateAvailable(info) => Ok(AppUpdateInfo {
-                available: true,
-                version: Some(info.TargetFullRelease.Version.clone()),
-            }),
-            _ => Ok(AppUpdateInfo { available: false, version: None }),
+            velopack::UpdateCheck::UpdateAvailable(info) => Ok(Some(info.TargetFullRelease.Version.clone())),
+            _ => Ok(None),
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())??;
+
+    if let Some(version) = velopack_result {
+        // Fetch release notes and size from GitHub API
+        let (notes, size) = fetch_github_release_info().await;
+        Ok(AppUpdateInfo {
+            available: true,
+            version: Some(version),
+            release_notes: notes,
+            download_size: size,
+        })
+    } else {
+        Ok(AppUpdateInfo { available: false, version: None, release_notes: None, download_size: None })
+    }
+}
+
+/// Fetch release notes and total asset size from GitHub releases API
+async fn fetch_github_release_info() -> (Option<String>, Option<u64>) {
+    let client = match reqwest::Client::builder()
+        .user_agent("RcloneMountHub")
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return (None, None),
+    };
+
+    let resp = match client.get(GITHUB_API_URL).send().await {
+        Ok(r) => r,
+        Err(_) => return (None, None),
+    };
+
+    let json: serde_json::Value = match resp.json().await {
+        Ok(j) => j,
+        Err(_) => return (None, None),
+    };
+
+    let notes = json.get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Sum all asset sizes for the download size estimate
+    let size = json.get("assets")
+        .and_then(|a| a.as_array())
+        .map(|assets| {
+            assets.iter()
+                .filter_map(|a| a.get("size").and_then(|s| s.as_u64()))
+                .sum()
+        });
+
+    (notes, size)
 }
 
 #[command]
-pub async fn apply_app_update() -> Result<(), String> {
-    // Kill all rclone mount processes before the update replaces files,
-    // otherwise the installer hits "Failed to remove existing application directory".
+pub async fn apply_app_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+
+    // Kill all rclone mount processes before the update replaces files
     crate::commands::rclone::kill_all_mounts();
 
-    tokio::task::spawn_blocking(|| {
+    // Set up a channel to forward download progress to the frontend
+    let (tx, rx) = std::sync::mpsc::channel::<i16>();
+    let handle = app.clone();
+
+    // Spawn a task to forward progress events from the channel to Tauri
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match rx.recv() {
+                Ok(progress) => {
+                    let _ = handle.emit("update-download-progress", progress);
+                }
+                Err(_) => break, // channel closed
+            }
+        }
+    });
+
+    tokio::task::spawn_blocking(move || {
         let source = velopack::sources::AutoSource::new(UPDATE_FEED_URL);
         let um = velopack::UpdateManager::new(source, None, None)
             .map_err(|e| e.to_string())?;
         if let velopack::UpdateCheck::UpdateAvailable(updates) =
             um.check_for_updates().map_err(|e| e.to_string())?
         {
-            um.download_updates(&updates, None).map_err(|e| e.to_string())?;
-            // This restarts the app after applying; auto_mount reconnects drives on startup
+            um.download_updates(&updates, Some(tx)).map_err(|e| e.to_string())?;
             um.apply_updates_and_restart(&updates).map_err(|e| e.to_string())?;
         }
         Ok(())
