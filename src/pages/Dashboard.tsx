@@ -267,6 +267,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   };
 
   const handleMount = async (conn: Connection) => {
+    // Prevent double-mount if already mounting or mounted
+    if (loading[conn.id]) return;
+    if (mountStatuses[conn.id]?.state === "mounted") return;
     setLoading({ ...loading, [conn.id]: true });
     addLog("info", `Mounting ${conn.name} to drive ${conn.drive_letter}:...`, "mounts");
 
@@ -304,6 +307,20 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       const errorMsg = err instanceof Error ? err.message : (typeof err === "string" ? err : `Failed to mount ${conn.name}`);
       addLog("error", `Mount failed: ${errorMsg}`, "mounts");
       toast.error(errorMsg);
+      // Clear any stale "mounted" status so the card reflects the failure
+      setMountStatuses(prev => ({
+        ...prev,
+        [conn.id]: {
+          connection_id: conn.id,
+          state: "error" as const,
+          active_mode: null,
+          active_url: null,
+          pid: null,
+          archive_pid: null,
+          error: errorMsg,
+          log: null,
+        },
+      }));
     } finally {
       setLoading({ ...loading, [conn.id]: false });
     }
